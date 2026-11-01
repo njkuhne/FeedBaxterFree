@@ -3,9 +3,9 @@ package selfhost
 import (
 	"net/http"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/api"
-	"github.com/njkuhne/feedbaxter/internal/service"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/api"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
 )
 
 var _ ext.Authenticator = (*Auth)(nil)

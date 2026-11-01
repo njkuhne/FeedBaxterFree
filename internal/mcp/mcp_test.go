@@ -17,11 +17,11 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/mcp"
-	"github.com/njkuhne/feedbaxter/internal/service"
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/store/storetest"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/mcp"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store/storetest"
 )
 
 func each(t *testing.T, fn func(t *testing.T, e *env)) {

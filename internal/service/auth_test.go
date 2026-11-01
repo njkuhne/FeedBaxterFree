@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/store/storetest"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store/storetest"
 )
 
 func TestPasswordHashRoundTrip(t *testing.T) {

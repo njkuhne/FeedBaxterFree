@@ -12,7 +12,7 @@ processor, HTTP) is started.
 
 | File | Contents |
 | --- | --- |
-| `go.mod`, `go.sum` | `module github.com/njkuhne/feedbaxter`, `go 1.27` exactly (use `go mod edit -go=1.27` if `go mod init`/`go get` writes a patch version or bumps it). All six allowed dependencies added with `go get` at the **package** paths later code imports, so go.sum is complete for M0–M1 (see "Dependencies"). |
+| `go.mod`, `go.sum` | `module github.com/njkuhne/feedbaxterfree`, `go 1.27` exactly (use `go mod edit -go=1.27` if `go mod init`/`go get` writes a patch version or bumps it). All six allowed dependencies added with `go get` at the **package** paths later code imports, so go.sum is complete for M0–M1 (see "Dependencies"). |
 | `feedbaxter.go` | package `feedbaxter`: `Version`, `Options`, `Run`, `Migrate`, `ErrNotImplemented`. |
 | `ext/ext.go` | package `ext`: the types below. Standard library imports only. |
 | `cmd/feedbaxter/main.go` | CLI, standard `flag` package only. |
@@ -70,7 +70,7 @@ Every exported identifier gets a doc comment. No methods beyond these, no extra 
 ```go
 package feedbaxter
 
-var Version = "dev" // set by -ldflags "-X github.com/njkuhne/feedbaxter.Version=<v>"
+var Version = "dev" // set by -ldflags "-X github.com/njkuhne/feedbaxterfree.Version=<v>"
 
 var ErrNotImplemented = errors.New("not implemented")
 

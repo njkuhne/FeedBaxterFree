@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 // isolate points the config at a temp SQLite file and an empty working directory.

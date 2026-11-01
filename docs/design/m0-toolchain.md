@@ -20,7 +20,7 @@ DOCKER_RUN  = docker run --rm -v "$(CURDIR)":/src -v fbx-gomodcache:/go/pkg/mod 
               -e CGO_ENABLED=0 -e GOTOOLCHAIN=local -e GOFLAGS=-buildvcs=false \
               -e GOOS -e GOARCH -e TEST_DATABASE_URL $(DOCKER_EXTRA) $(GO_IMAGE)
 GO         ?= $(DOCKER_RUN) go        # CI sets GO=go to use a native toolchain
-LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxter.Version=$(VERSION)
+LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxterfree.Version=$(VERSION)
 SIZE_LIMIT ?= 33554432                # 32 MiB
 PG_URL_DEV  = postgres://feedbaxter:feedbaxter@postgres:5432/feedbaxter_test?sslmode=disable
 ```

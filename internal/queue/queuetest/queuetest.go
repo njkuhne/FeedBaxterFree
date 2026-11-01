@@ -5,8 +5,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
 )
 
 const (

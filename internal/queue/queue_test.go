@@ -10,9 +10,9 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/queue"
-	"github.com/njkuhne/feedbaxter/internal/queue/queuetest"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/internal/queue/queuetest"
 )
 
 func TestStreamRejectsWhenFullMsgs(t *testing.T) {

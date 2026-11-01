@@ -10,9 +10,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/queue"
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 // Service holds the dependencies of the business logic.

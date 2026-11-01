@@ -13,22 +13,22 @@ import (
 	"os"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/api"
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/ingest"
-	"github.com/njkuhne/feedbaxter/internal/ingest/keysync"
-	"github.com/njkuhne/feedbaxter/internal/mcp"
-	"github.com/njkuhne/feedbaxter/internal/processor"
-	"github.com/njkuhne/feedbaxter/internal/queue"
-	"github.com/njkuhne/feedbaxter/internal/selfhost"
-	"github.com/njkuhne/feedbaxter/internal/service"
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/ui"
-	"github.com/njkuhne/feedbaxter/web"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/api"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/ingest"
+	"github.com/njkuhne/feedbaxterfree/internal/ingest/keysync"
+	"github.com/njkuhne/feedbaxterfree/internal/mcp"
+	"github.com/njkuhne/feedbaxterfree/internal/processor"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/internal/selfhost"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/ui"
+	"github.com/njkuhne/feedbaxterfree/web"
 )
 
-// Version is the build version, set by -ldflags "-X github.com/njkuhne/feedbaxter.Version=<v>".
+// Version is the build version, set by -ldflags "-X github.com/njkuhne/feedbaxterfree.Version=<v>".
 var Version = "dev"
 
 // ErrNotImplemented is returned by functionality that lands in a later milestone.

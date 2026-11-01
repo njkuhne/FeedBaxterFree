@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/njkuhne/feedbaxter/ext"
+	"github.com/njkuhne/feedbaxterfree/ext"
 )
 
 // ServeHTTP applies, in order: Cache-Control, the CSRF check, principal

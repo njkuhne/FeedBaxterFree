@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/selfhost"
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/selfhost"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 type noKeys struct{}

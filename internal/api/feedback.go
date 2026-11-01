@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/service"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
 )
 
 func parseTime(q, name string) (*time.Time, error) {

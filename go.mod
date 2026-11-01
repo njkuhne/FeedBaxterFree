@@ -1,4 +1,4 @@
-module github.com/njkuhne/feedbaxter
+module github.com/njkuhne/feedbaxterfree
 
 go 1.27
 

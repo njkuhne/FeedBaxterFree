@@ -13,7 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/njkuhne/feedbaxter/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
 )
 
 const (

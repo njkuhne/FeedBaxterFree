@@ -16,10 +16,10 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/mcp"
-	"github.com/njkuhne/feedbaxter/internal/service"
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/mcp"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 type syncBuf struct {

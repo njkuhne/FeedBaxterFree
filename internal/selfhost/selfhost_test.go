@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/ingest"
-	"github.com/njkuhne/feedbaxter/internal/ingest/keysync"
-	"github.com/njkuhne/feedbaxter/internal/queue"
-	"github.com/njkuhne/feedbaxter/internal/queue/queuetest"
-	"github.com/njkuhne/feedbaxter/internal/service"
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/store/storetest"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/ingest"
+	"github.com/njkuhne/feedbaxterfree/internal/ingest/keysync"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/internal/queue/queuetest"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store/storetest"
 )
 
 var keyLine = regexp.MustCompile(`ingest key for channel Default: (fbx_[a-z2-7]{32})`)

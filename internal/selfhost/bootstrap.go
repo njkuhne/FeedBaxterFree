@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/service"
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 // DefaultAdminEmail is the admin created when none is configured.

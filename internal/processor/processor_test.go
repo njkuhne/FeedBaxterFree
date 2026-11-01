@@ -14,11 +14,11 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/njkuhne/feedbaxter/internal/processor"
-	"github.com/njkuhne/feedbaxter/internal/queue"
-	"github.com/njkuhne/feedbaxter/internal/queue/queuetest"
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/store/storetest"
+	"github.com/njkuhne/feedbaxterfree/internal/processor"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/internal/queue/queuetest"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store/storetest"
 )
 
 const (

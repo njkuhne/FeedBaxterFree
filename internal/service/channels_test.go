@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/ingest"
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/store/storetest"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/ingest"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store/storetest"
 )
 
 func (f *fixture) cacheEntry(t *testing.T, plaintext string) (ingest.Entry, bool) {

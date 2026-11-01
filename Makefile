@@ -6,7 +6,7 @@ DOCKER_RUN  = docker run --rm -v "$(CURDIR)":/src -v fbx-gomodcache:/go/pkg/mod 
               -e GOOS -e GOARCH -e TEST_DATABASE_URL $(DOCKER_EXTRA) $(GO_IMAGE)
 # CI sets GO=go to use a native toolchain.
 GO         ?= $(DOCKER_RUN) go
-LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxter.Version=$(VERSION)
+LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxterfree.Version=$(VERSION)
 # 32 MiB.
 SIZE_LIMIT ?= 33554432
 # 48 MiB.

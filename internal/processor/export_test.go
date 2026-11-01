@@ -3,7 +3,7 @@ package processor
 import (
 	"time"
 
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 // SetDB swaps the database, so tests can take it away and bring it back.

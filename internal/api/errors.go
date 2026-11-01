@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/njkuhne/feedbaxter/internal/service"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
 )
 
 // Error codes that are not service kinds.

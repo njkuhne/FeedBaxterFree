@@ -11,8 +11,8 @@ import (
 
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
 )
 
 const (

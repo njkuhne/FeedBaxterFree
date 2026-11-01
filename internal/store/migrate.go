@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/ext"
+	"github.com/njkuhne/feedbaxterfree/ext"
 )
 
 //go:embed migrations/*.sql

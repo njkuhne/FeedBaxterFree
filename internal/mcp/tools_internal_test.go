@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/njkuhne/feedbaxter/internal/service"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
 )
 
 func TestToolErrMapping(t *testing.T) {

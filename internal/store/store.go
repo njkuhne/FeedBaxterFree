@@ -15,7 +15,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 	_ "modernc.org/sqlite"             // registers the "sqlite" driver
 
-	"github.com/njkuhne/feedbaxter/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
 )
 
 // DB is an open database and its dialect.

@@ -8,8 +8,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/njkuhne/feedbaxter/internal/processor"
-	"github.com/njkuhne/feedbaxter/internal/queue"
+	"github.com/njkuhne/feedbaxterfree/internal/processor"
+	"github.com/njkuhne/feedbaxterfree/internal/queue"
 )
 
 func testCfg() processor.Config {

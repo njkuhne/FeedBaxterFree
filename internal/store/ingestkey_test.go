@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/store/storetest"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store/storetest"
 )
 
 func TestGenerateIngestKey(t *testing.T) {

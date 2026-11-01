@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/njkuhne/feedbaxter/internal/api"
+	"github.com/njkuhne/feedbaxterfree/internal/api"
 )
 
 func TestLoginFlowForcedChange(t *testing.T) {

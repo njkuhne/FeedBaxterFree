@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/njkuhne/feedbaxter/internal/config"
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 // ForEachDialect runs fn as subtest "sqlite" on a migrated SQLite DB in

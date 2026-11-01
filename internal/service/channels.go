@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 func cleanName(name, what string) (string, error) {

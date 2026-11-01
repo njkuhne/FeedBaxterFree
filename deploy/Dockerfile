@@ -16,7 +16,7 @@ COPY . .
 COPY --from=ui /web/dist ./web/dist
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=-buildvcs=false GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags "-s -w -X github.com/njkuhne/feedbaxter.Version=${VERSION}" \
+    go build -trimpath -ldflags "-s -w -X github.com/njkuhne/feedbaxterfree.Version=${VERSION}" \
     -o /out/feedbaxter ./cmd/feedbaxter
 RUN mkdir -p /out/data && chown 65532:65532 /out/data
 

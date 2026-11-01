@@ -59,7 +59,7 @@ small: the IIFE budget is 4 KiB gzipped.
   },
   "unpkg": "./dist/feedbaxter.js",
   "jsdelivr": "./dist/feedbaxter.js",
-  "repository": { "type": "git", "url": "git+https://github.com/njkuhne/FeedBaxter.git", "directory": "sdk/web" },
+  "repository": { "type": "git", "url": "git+https://github.com/njkuhne/FeedBaxterFree.git", "directory": "sdk/web" },
   "engines": { "node": ">=22" },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

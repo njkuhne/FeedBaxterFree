@@ -3,8 +3,8 @@ package store_test
 import (
 	"testing"
 
-	"github.com/njkuhne/feedbaxter/internal/store"
-	"github.com/njkuhne/feedbaxter/internal/store/storetest"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store/storetest"
 )
 
 func exec(t *testing.T, db *store.DB, q string, args ...any) error {

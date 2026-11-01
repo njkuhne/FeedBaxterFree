@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/njkuhne/feedbaxter/ext"
-	"github.com/njkuhne/feedbaxter/internal/service"
+	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
 )
 
 func (a *api) listUsers(w http.ResponseWriter, r *http.Request, p ext.Principal) error {

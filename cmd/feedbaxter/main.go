@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/njkuhne/feedbaxter"
-	"github.com/njkuhne/feedbaxter/internal/config"
+	"github.com/njkuhne/feedbaxterfree"
+	"github.com/njkuhne/feedbaxterfree/internal/config"
 )
 
 const usage = `Usage: feedbaxter <command> [flags]

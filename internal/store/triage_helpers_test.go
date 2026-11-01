@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 func seedUser(t *testing.T, db *store.DB, tenantID, email, role string, at int64) store.User {
