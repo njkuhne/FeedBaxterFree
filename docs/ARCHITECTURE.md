@@ -42,7 +42,7 @@ Self-host uses `all` with SQLite. SaaS runs each mode as its own deployment agai
 
 ## 2. Module and package layout
 
-Module path: `github.com/feedbaxter/feedbaxter` (change in `go.mod` if the GitHub org differs; nothing else depends on the literal path).
+Module path: `github.com/njkuhne/feedbaxter` (repo: https://github.com/njkuhne/FeedBaxter).
 
 ```
 cmd/feedbaxter/        main: `serve --mode=<ingest|worker|api|all>`, `migrate`, `reset-admin`
