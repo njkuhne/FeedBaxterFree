@@ -23,4 +23,3 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 | PAT-only auth on `/mcp`, no OAuth | M4 | Clients that require OAuth discovery cannot connect. Revisit if customers ask. |
 | No export tool over MCP | M4 | `list_feedback` pages instead (up to 200 per call). The UI and `GET /api/feedback/export` cover full exports. |
 | No request logging on `/mcp` | M4 | Only errors are logged, with no tokens or inputs. Add a quiet access line (tool name, status, duration) if operators need it. |
-| Intermittent `internal/processor` test failure | M4 | Seen once during M4 in `make test`: "dead-letter publish failed … nats: no response from stream". Passed on rerun and the test was not identified. Capture the test name next time it happens. |

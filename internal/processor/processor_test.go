@@ -135,10 +135,19 @@ func (e *env) pending(t *testing.T) (ackPending, pending int) {
 	return ci.NumAckPending, int(ci.NumPending)
 }
 
+// drained reports whether every message has been acked or terminated. It
+// reads the stream, not the consumer: FEEDBACK is a work queue, so a message
+// leaves it only when settled, and the count is exact the moment a publish is
+// acknowledged. The consumer's pending counters can read zero for an instant
+// after a publish, before the processor has fetched anything, which once made
+// TestRedeliveredDuplicateHarmless see "drained" with no rows stored.
 func (e *env) drained(t *testing.T) func() bool {
 	return func() bool {
-		a, p := e.pending(t)
-		return a == 0 && p == 0
+		si, err := e.o.Stream.Info(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return si.State.Msgs == 0
 	}
 }
 
