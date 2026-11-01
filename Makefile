@@ -20,7 +20,7 @@ COMPOSE_DEV = docker compose -f deploy/compose.dev.yml
 HOST_GOOS   = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 HOST_GOARCH = $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 
-.PHONY: help build dev test test-pg vet lint image size-check clean ui dev-ui
+.PHONY: help build dev test test-pg vet lint image size-check clean ui dev-ui sdk-web
 
 .DEFAULT_GOAL := help
 
@@ -29,6 +29,9 @@ help: ## List targets
 
 ui: ## Build the admin UI into web/dist (needs Node 22+)
 	cd web && npm ci --no-audit --no-fund && npm run build
+
+sdk-web: ## Build and test the web SDK (needs Node 22+)
+	cd sdk/web && npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build
 
 dev-ui: ## Vite dev server on localhost:5173, proxying /api and /v1 to make dev (:8090)
 	cd web && npm run dev

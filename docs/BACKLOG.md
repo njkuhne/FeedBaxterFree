@@ -23,3 +23,10 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 | PAT-only auth on `/mcp`, no OAuth | M4 | Clients that require OAuth discovery cannot connect. Revisit if customers ask. |
 | No export tool over MCP | M4 | `list_feedback` pages instead (up to 200 per call). The UI and `GET /api/feedback/export` cover full exports. |
 | No request logging on `/mcp` | M4 | Only errors are logged, with no tokens or inputs. Add a quiet access line (tool name, status, duration) if operators need it. |
+| Serve `feedbaxter.js` from the binary | M5 | Serve it (for example at `/sdk/feedbaxter.js`) so self-hosters need no CDN. |
+| No send on page unload | M5 | No `keepalive` fetch or `sendBeacon`; a submission made just before the tab closes can be lost if its first attempt has not finished. |
+| No periodic backlog timer | M5 | Queued items retry on the next `send`, `online` event or page load only. |
+| Web SDK tabs share one backlog without locking | M5 | Concurrent flushes can send an item twice (deduped by the server) and in a rare write race one tab's addition can be lost. |
+| npm publishing not set up | M5 | Scope `@feedbaxter`, provenance and a release workflow are still to do. |
+| Swift SDK | M5 | M5 part 2. |
+| Web SDK backlog is not keyed by server `url` | M5 | Items store the ingest key but not the origin, so two clients on one page pointed at different FeedBaxter servers share a backlog and a queued item can be flushed to the other server. One app talks to one server, so this is left as is. |

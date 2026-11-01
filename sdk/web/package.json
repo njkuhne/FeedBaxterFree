@@ -1,0 +1,28 @@
+{
+  "name": "@feedbaxter/web",
+  "version": "0.1.0",
+  "description": "Send app feedback to FeedBaxter from the browser.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist", "README.md"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./feedbaxter.js": "./dist/feedbaxter.js",
+    "./package.json": "./package.json"
+  },
+  "unpkg": "./dist/feedbaxter.js",
+  "jsdelivr": "./dist/feedbaxter.js",
+  "repository": { "type": "git", "url": "git+https://github.com/njkuhne/FeedBaxter.git", "directory": "sdk/web" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run && npm run build",
+    "build": "vite build --mode esm && vite build --mode iife && tsc -p tsconfig.build.json && node scripts/check.mjs",
+    "size": "node scripts/check.mjs"
+  },
+  "devDependencies": { "jsdom": "29.1.1", "typescript": "7.0.2", "vite": "8.3.5", "vitest": "4.1.12" }
+}

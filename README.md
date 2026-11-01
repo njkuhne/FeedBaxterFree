@@ -56,9 +56,12 @@ Run `make help` for the full list.
 - [Product spec](docs/SPEC.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [MCP server](docs/MCP.md)
+- [Web SDK](sdk/web/README.md)
 - [Decision records](docs/adr/)
 - [Component design briefs](docs/design/)
 
 ## License
 
 AGPL-3.0, see `LICENSE`.
+
+The Web SDK in `sdk/web` is MIT-licensed so it can be embedded in any app; see `sdk/web/LICENSE`.

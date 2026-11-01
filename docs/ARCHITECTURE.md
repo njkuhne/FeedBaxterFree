@@ -57,7 +57,7 @@ internal/api           router, session auth, handlers, export, ops endpoint, emb
 internal/mcp           MCP server and tools
 internal/ops           health and readiness, in-process metrics snapshot
 web/                   React + Vite + TypeScript admin UI; `web/dist` is embedded by internal/api
-sdk/web/               npm package and script tag build
+sdk/web/               npm package (@feedbaxter/web, MIT) and script tag build; see sdk/web/README.md
 sdk/swift/             Swift package
 deploy/                Dockerfile (scratch, multi-stage), docker-compose.yml (self-host), compose.dev.yml (Postgres + NATS for tests)
 docs/                  SPEC.md, REVIEW.md, ARCHITECTURE.md, design/, adr/

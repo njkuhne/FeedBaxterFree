@@ -23,6 +23,17 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: cd web && npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build
 
+  sdk-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sdk/web/package-lock.json
+      - run: cd sdk/web && npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build
+
   vet:
     runs-on: ubuntu-latest
     steps:
