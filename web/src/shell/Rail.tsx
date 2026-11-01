@@ -4,9 +4,20 @@ import { Button } from "../components/Button";
 import { useAuth } from "./AuthProvider";
 
 /** Inbox is current on `/`, feedback detail and the per-user view. */
-function isCurrent(to: string, pathname: string): boolean {
+export function isCurrent(to: string, pathname: string): boolean {
   if (to !== "/") return pathname === to;
   return pathname === "/" || pathname.startsWith("/feedback/") || pathname.startsWith("/user/");
+}
+
+/** The main navigation, shared by the rail and the compact top bar. */
+export function navItems(admin: boolean): { to: string; label: string }[] {
+  const items: { to: string; label: string }[] = [{ to: "/", label: "Inbox" }];
+  if (admin) {
+    items.push({ to: "/channels", label: "Channels and keys" });
+    items.push({ to: "/people", label: "People" });
+    items.push({ to: "/settings", label: "Settings" });
+  }
+  return items;
 }
 
 export function Rail() {
@@ -14,12 +25,7 @@ export function Rail() {
   const { pathname } = useLocation();
   if (!user) return null;
   const admin = user.role === "admin";
-  const items: { to: string; label: string }[] = [{ to: "/", label: "Inbox" }];
-  if (admin) {
-    items.push({ to: "/channels", label: "Channels and keys" });
-    items.push({ to: "/people", label: "People" });
-    items.push({ to: "/settings", label: "Settings" });
-  }
+  const items = navItems(admin);
   return (
     <nav className="rail" aria-label="Main">
       <Link to="/" className="brand">

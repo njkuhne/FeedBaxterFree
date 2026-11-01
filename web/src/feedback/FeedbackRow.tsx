@@ -1,7 +1,8 @@
-import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Checkbox } from "../components/Checkbox";
 import { StatusMarker, STATUS_LABEL } from "../components/StatusMarker";
+import { MetaItem, MetaList } from "../components/MetaList";
 import { Highlight } from "../components/Highlight";
 import { TagPill } from "../components/TagPill";
 import { filtersToQuery } from "../lib/filters";
@@ -64,6 +65,10 @@ interface FeedbackRowProps {
   /** `range` is true for a Shift-click. */
   onToggle: (range: boolean) => void;
   onCurrent: () => void;
+  /** Below 880 px: the relative time joins the meta line instead of its own column. */
+  narrow?: boolean;
+  /** The selection checkbox column. Always on desktop; on narrow only in Select mode. */
+  showCheck?: boolean;
 }
 
 export function FeedbackRow({
@@ -77,6 +82,8 @@ export function FeedbackRow({
   now,
   onToggle,
   onCurrent,
+  narrow = false,
+  showCheck = true,
 }: FeedbackRowProps) {
   const navigate = useNavigate();
   const query = from.filters.q;
@@ -88,6 +95,11 @@ export function FeedbackRow({
       ? `/?${new URLSearchParams({ status: "all", tag }).toString()}`
       : `/?${filtersToQuery({ ...from.filters, tag }).toString()}`;
   const path = `/feedback/${encodeURIComponent(item.id)}`;
+  const time = (
+    <time className="row-time" dateTime={item.receivedAt} title={absoluteTime(item.receivedAt)}>
+      {relativeTime(item.receivedAt, now === undefined ? new Date() : new Date(now))}
+    </time>
+  );
   const parts: { text: string; className?: string }[] = [
     ...(showStatus ? [{ text: STATUS_LABEL[item.status], className: "row-status" }] : []),
     ...(showUser ? [{ text: item.userId ?? "No user ID" }] : []),
@@ -98,7 +110,7 @@ export function FeedbackRow({
   const pills = item.tags.slice(0, MAX_PILLS);
   const more = item.tags.length - pills.length;
   const tabIndex = current ? 0 : -1;
-  const classes = ["row", selected ? "row-selected" : "", current ? "row-current" : ""].filter(Boolean).join(" ");
+  const classes = ["row", narrow ? "row-narrow" : "", showCheck ? "row-has-check" : "", selected ? "row-selected" : "", current ? "row-current" : ""].filter(Boolean).join(" ");
 
   // The whole row opens the item, except clicks on controls and while text is being selected.
   const open = (e: ReactMouseEvent<HTMLLIElement>) => {
@@ -111,15 +123,17 @@ export function FeedbackRow({
 
   return (
     <li className={classes} data-id={item.id} onClick={open}>
-      <div className="row-check">
-        <Checkbox
-          label={`Select: ${preview.replace(/\s+/g, " ").slice(0, 40)}`}
-          hideLabel
-          checked={selected}
-          tabIndex={tabIndex}
-          onChange={(e) => onToggle(e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey)}
-        />
-      </div>
+      {showCheck ? (
+        <div className="row-check">
+          <Checkbox
+            label={`Select: ${preview.replace(/\s+/g, " ").slice(0, 40)}`}
+            hideLabel
+            checked={selected}
+            tabIndex={tabIndex}
+            onChange={(e) => onToggle(e.nativeEvent instanceof MouseEvent && e.nativeEvent.shiftKey)}
+          />
+        </div>
+      ) : null}
       <StatusMarker status={item.status} {...(showStatus ? {} : { label: STATUS_LABEL[item.status] })} />
       <div className="row-body">
         <Link to={path} state={{ from }} className="row-link" tabIndex={tabIndex} onFocus={onCurrent} onClick={onCurrent}>
@@ -127,26 +141,24 @@ export function FeedbackRow({
             <Highlight text={shown} query={query} />
           </span>
         </Link>
-        <p className="row-meta">
+        <MetaList as="div" className="row-meta">
           {parts.map((p, i) => (
-            <Fragment key={i}>
-              {i > 0 ? " · " : null}
-              <span className={p.className}>{p.text}</span>
-            </Fragment>
+            <MetaItem key={i} {...(p.className === undefined ? {} : { className: p.className })}>
+              {p.text}
+            </MetaItem>
           ))}
           {pills.length > 0 ? (
-            <span className={parts.length > 0 ? "row-tags row-tags-after" : "row-tags"}>
+            <MetaItem className="row-tags">
               {pills.map((t) => (
                 <TagPill key={t} name={t} to={tagHref(t)} tabIndex={tabIndex} />
               ))}
               {more > 0 ? <span className="row-more">+{more}</span> : null}
-            </span>
+            </MetaItem>
           ) : null}
-        </p>
+          {narrow ? <MetaItem>{time}</MetaItem> : null}
+        </MetaList>
       </div>
-      <time className="row-time" dateTime={item.receivedAt} title={absoluteTime(item.receivedAt)}>
-        {relativeTime(item.receivedAt, now === undefined ? new Date() : new Date(now))}
-      </time>
+      {narrow ? null : time}
     </li>
   );
 }

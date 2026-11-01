@@ -57,6 +57,21 @@ pre {
   font-family: var(--font-mono);
 }
 
+/* Long IDs, keys and code never widen the page; pre blocks scroll inside themselves. */
+code,
+.mono {
+  overflow-wrap: anywhere;
+}
+
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+pre code {
+  overflow-wrap: normal;
+}
+
 ::selection {
   background: var(--dusk-tint);
   color: var(--ink);

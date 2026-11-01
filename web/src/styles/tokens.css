@@ -65,6 +65,8 @@
   --focus-offset: 2px;
   --target: 44px;
   --rail-width: 232px;
+  /* the sticky status bar on narrow detail: two 44 px rows, an 8 px gap, 8 px padding top and bottom */
+  --bottom-bar-height: 112px;
   --content-max: 760px;
   /* about 62 characters of Inter */
   --measure: 33em;

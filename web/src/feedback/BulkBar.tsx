@@ -22,6 +22,8 @@ interface BulkBarProps {
   onAddTag: (tag: string) => Promise<boolean>;
   onRemoveTag: (tag: string) => void;
   onClear: () => void;
+  /** Narrow Select mode has its own Done button, so the bar leaves out Clear. */
+  hideClear?: boolean;
 }
 
 /** The popover behind "Tag…": the shared tag editor in add-only mode. It stays open for another tag. */
@@ -126,6 +128,7 @@ export function BulkBar({
   onAddTag,
   onRemoveTag,
   onClear,
+  hideClear = false,
 }: BulkBarProps) {
   const working = busy > 0;
   return (
@@ -138,9 +141,11 @@ export function BulkBar({
       ))}
       <BulkTagPopover tags={tags} disabled={working} requested={tagRequested} onOpened={onTagOpened} onAddTag={onAddTag} />
       <RemoveTagPopover items={selectedItems} disabled={working} onRemove={onRemoveTag} />
-      <Button variant="text" className="bulk-clear" disabled={working} onClick={onClear}>
-        Clear
-      </Button>
+      {hideClear ? null : (
+        <Button variant="text" className="bulk-clear" disabled={working} onClick={onClear}>
+          Clear
+        </Button>
+      )}
     </div>
   );
 }

@@ -12,6 +12,8 @@ interface Opts {
   q?: string;
   kind?: "inbox" | "user";
   onToggle?: (range: boolean) => void;
+  narrow?: boolean;
+  showCheck?: boolean;
 }
 
 function row(item = fb({ id: "fb_1" }), o: Opts = {}) {
@@ -38,6 +40,8 @@ function row(item = fb({ id: "fb_1" }), o: Opts = {}) {
                 }}
                 onToggle={o.onToggle ?? (() => undefined)}
                 onCurrent={() => undefined}
+                {...(o.narrow === undefined ? {} : { narrow: o.narrow })}
+                {...(o.showCheck === undefined ? {} : { showCheck: o.showCheck })}
               />
             </ul>
           }
@@ -171,5 +175,31 @@ describe("FeedbackRow", () => {
     // Clicking the pill does not open the row.
     fireEvent.click(other);
     expect(screen.queryByText("Opened detail")).toBeNull();
+  });
+
+  it("narrow row puts the time in the meta line", () => {
+    const wide = row(fb({ id: "fb_1", tags: ["bug"] }));
+    expect(wide.container.querySelectorAll("time")).toHaveLength(1);
+    expect(wide.container.querySelector(".row-meta time")).toBeNull();
+    wide.unmount();
+    const narrow = row(fb({ id: "fb_1", tags: ["bug"] }), { narrow: true, showCheck: false });
+    expect(narrow.container.querySelectorAll("time")).toHaveLength(1);
+    const items = Array.from(narrow.container.querySelectorAll(".row-meta > *"));
+    expect(items[items.length - 1]?.querySelector("time")).not.toBeNull();
+    expect(items[items.length - 2]?.className).toBe("row-tags");
+    expect(narrow.container.querySelector("input[type=checkbox]")).toBeNull();
+  });
+
+  it("row meta has no separator text", () => {
+    const { container } = row(fb({ id: "fb_1", status: "reviewed", tags: ["bug", "ui"] }), { showChannel: true, narrow: true });
+    const meta = container.querySelector(".row-meta") as HTMLElement;
+    const walker = document.createTreeWalker(meta, NodeFilter.SHOW_TEXT);
+    let count = 0;
+    for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+      count += 1;
+      expect(/^\s*\u00b7\s*$/.test(n.textContent ?? "")).toBe(false);
+    }
+    expect(count).toBeGreaterThan(3);
+    expect(meta.textContent).not.toContain("\u00b7");
   });
 });

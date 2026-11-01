@@ -232,6 +232,35 @@
   min-width: 0;
 }
 
+.segmented-scroll {
+  position: relative;
+  min-width: 0;
+}
+
+@media (max-width: 879px) {
+  /* One scrolling row; the bottom rule spans the full width. */
+  .segmented-scroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .segmented-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .segmented {
+    flex-wrap: nowrap;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .segmented-option {
+    flex: none;
+    padding: 0 var(--s-2);
+    white-space: nowrap;
+  }
+}
+
 .segmented-option {
   position: relative;
   display: inline-flex;
@@ -394,6 +423,11 @@
     left: var(--s-4);
     max-width: calc(100vw - 32px);
   }
+}
+
+/* Toasts sit above the sticky status bar on the narrow detail page. */
+body:has(.status-bar) .toasts {
+  bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom) + var(--s-3));
 }
 
 .toast-region {
@@ -699,8 +733,16 @@
   font-size: var(--fs-meta);
 }
 
+.facts dt,
 .facts dd {
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 879px) {
+  .facts {
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    column-gap: var(--s-4);
+  }
 }
 
 /* Forms */
@@ -729,4 +771,36 @@
 
 .inline-form .field {
   width: min(320px, 100%);
+}
+
+/* Meta lines: a wrapping list whose separators are drawn by CSS, so no dot is a text node.
+   Each item after the first draws a dot centred in the gap before it. The first item on a wrapped
+   line sits at the left edge, so its dot falls outside the clip and disappears: no line starts or
+   ends with a dot. */
+.meta-list {
+  --meta-gap: var(--s-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--meta-gap);
+  margin: 0 0 0 calc(var(--s-1) * -1);
+  padding: 0 0 0 var(--s-1);
+  list-style: none;
+  clip-path: inset(-12px -12px -12px 0);
+}
+
+.meta-list > * {
+  position: relative;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta-list > * + *::before {
+  content: "\00b7";
+  content: "\00b7" / "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--meta-gap) / -2);
+  translate: -50% -50%;
+  color: var(--ink-muted);
 }

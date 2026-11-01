@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAnnounce } from "../components/Announcer";
 import { Button } from "../components/Button";
@@ -6,6 +6,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmailWarning } from "../components/EmailWarning";
 import { ArrowLeftIcon } from "../components/icons";
 import { InlineAlert } from "../components/InlineAlert";
+import { MetaItem, MetaList } from "../components/MetaList";
 import { PageTitle } from "../components/PageTitle";
 import { StatusChip } from "../components/StatusChip";
 import { STATUS_LABEL } from "../components/StatusMarker";
@@ -24,6 +25,7 @@ import {
   stats as fetchStats,
 } from "../lib/endpoints";
 import { matchesFilters } from "../lib/filters";
+import { useNarrow } from "../lib/useMediaQuery";
 import { shortcutFor, type KeyLike, type ShortcutAction } from "../lib/shortcuts";
 import { platformName } from "../lib/format";
 import { absoluteTime, relativeTime } from "../lib/time";
@@ -83,6 +85,7 @@ export default function FeedbackDetail() {
   const announce = useAnnounce();
   const undo = useUndo();
   const now = useNow();
+  const narrow = useNarrow();
   const from = readFrom(location.state);
   const fromKey = from?.key ?? null;
   const [load, setLoad] = useState<Load>({ id, phase: "loading" });
@@ -391,8 +394,40 @@ export default function FeedbackDetail() {
     }
   };
 
+  // One set of status buttons: inline under the message on desktop, the sticky bar on narrow screens.
+  const statusActions = (
+    <div
+      className={narrow ? (hasNext ? "status-actions status-bar" : "status-actions status-bar status-bar-solo") : "status-actions"}
+      role="group"
+      aria-label="Status"
+    >
+      {ACTION_ORDER.map((s) => (
+        <Button
+          key={s}
+          variant={s === primary ? "primary" : "text"}
+          disabled={queue.busy || f.status === s}
+          onClick={() => void changeStatus(s)}
+        >
+          {ACTION_LABEL[s]}
+        </Button>
+      ))}
+      {narrow && hasNext ? (
+        <Button
+          variant="text"
+          className="status-next"
+          disabled={queue.busy}
+          loading={paging}
+          loadingLabel="Loading…"
+          onClick={() => void goNext()}
+        >
+          Next
+        </Button>
+      ) : null}
+    </div>
+  );
+
   return (
-    <div className="detail">
+    <div className={narrow ? "detail detail-has-bar" : "detail"}>
       <div className="detail-nav">
         <Button variant="text" className="detail-back" aria-label={backName} onClick={() => goBack()}>
           <ArrowLeftIcon />
@@ -420,40 +455,28 @@ export default function FeedbackDetail() {
         ) : null}
       </div>
       <PageTitle hidden>{f.userId !== null ? `Feedback from ${f.userId}` : "Feedback with no user ID"}</PageTitle>
-      <div className="detail-meta">
-        <StatusChip status={f.status} />
-        <span aria-hidden="true">·</span>
-        {f.userId !== null ? (
-          <Link to={`/user/${encodeURIComponent(f.userId)}`}>{f.userId}</Link>
-        ) : (
-          <span>No user ID</span>
-        )}
-        {f.platform ? <MetaPart>{platformName(f.platform)}</MetaPart> : null}
-        {f.appVersion ? <MetaPart>{f.appVersion}</MetaPart> : null}
-        {channelCount >= 2 ? <MetaPart>{f.channelName ?? "Deleted channel"}</MetaPart> : null}
-        <MetaPart>
+      <MetaList className="detail-meta">
+        <MetaItem>
+          <StatusChip status={f.status} />
+        </MetaItem>
+        <MetaItem>
+          {f.userId !== null ? <Link to={`/user/${encodeURIComponent(f.userId)}`}>{f.userId}</Link> : "No user ID"}
+        </MetaItem>
+        {f.platform ? <MetaItem>{platformName(f.platform)}</MetaItem> : null}
+        {f.appVersion ? <MetaItem>{f.appVersion}</MetaItem> : null}
+        {channelCount >= 2 ? <MetaItem>{f.channelName ?? "Deleted channel"}</MetaItem> : null}
+        <MetaItem>
           <time dateTime={f.receivedAt}>{absoluteTime(f.receivedAt)}</time>{" "}
           <span className="detail-time">({relativeTime(f.receivedAt, new Date(now))})</span>
-        </MetaPart>
-      </div>
+        </MetaItem>
+      </MetaList>
       <EmailWarning userId={f.userId} />
 
       <p className="message">
         <Highlight text={f.message} query={from?.filters.q ?? ""} />
       </p>
 
-      <div className="status-actions">
-        {ACTION_ORDER.map((s) => (
-          <Button
-            key={s}
-            variant={s === primary ? "primary" : "text"}
-            disabled={queue.busy || f.status === s}
-            onClick={() => void changeStatus(s)}
-          >
-            {ACTION_LABEL[s]}
-          </Button>
-        ))}
-      </div>
+      {narrow ? null : statusActions}
 
       <section className="section" aria-labelledby={`${listId}-tags`}>
         <h2 className="visually-hidden" id={`${listId}-tags`}>
@@ -510,6 +533,8 @@ export default function FeedbackDetail() {
         ) : null}
       </div>
 
+      {narrow ? statusActions : null}
+
       {confirming ? (
         <ConfirmDialog
           danger
@@ -530,14 +555,5 @@ export default function FeedbackDetail() {
         />
       ) : null}
     </div>
-  );
-}
-
-function MetaPart({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <span aria-hidden="true">·</span>
-      <span>{children}</span>
-    </>
   );
 }

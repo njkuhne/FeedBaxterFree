@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { listKey } from "../feedback/listStore";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { listKey, setList } from "../feedback/listStore";
 import { fb, mockApi, renderPage, renderRoutes, type Call } from "../feedback/testHelpers";
+import { mockMatchMedia } from "../test-media";
 import type { FeedbackDetail as Detail, Role, Status } from "../lib/types";
 import FeedbackDetail from "./FeedbackDetail";
 
@@ -222,5 +223,98 @@ describe("FeedbackDetail", () => {
     await screen.findAllByText("Restored tag bug on 1 item.");
     expect(calls.find((c) => c.path === "/api/feedback/add-tags")?.body).toEqual({ ids: ["fb_1"], tags: ["bug"] });
     expect(await screen.findByRole("button", { name: "Remove tag bug" })).toBeTruthy();
+  });
+});
+
+describe("FeedbackDetail on a narrow screen", () => {
+  let restore: () => void = () => undefined;
+  beforeEach(() => {
+    restore = mockMatchMedia(true);
+  });
+  afterEach(() => restore());
+
+  const group = () => screen.getByRole("group", { name: "Status" });
+
+  function openFromList(d: Detail, opts: { next: boolean }) {
+    mockApi((c) => routes(c, d));
+    const filters = { status: "new", tag: "", channel: "", q: "", userId: "" } as const;
+    const key = listKey(filters);
+    const items = opts.next ? [fb({ id: "fb_1" }), fb({ id: "fb_2" })] : [fb({ id: "fb_1" })];
+    setList(key, { filters, items, nextCursor: null });
+    const from = { kind: "inbox" as const, key, filters, path: "/", label: "Inbox" };
+    return renderRoutes(
+      [{ pathname: "/feedback/fb_1", state: { from } }],
+      [{ path: "/feedback/:id", element: <FeedbackDetail /> }],
+    );
+  }
+
+  it("narrow detail renders the sticky bar with the four actions in order", async () => {
+    setup(detail({ status: "new" }));
+    await screen.findByText("Message fb_1");
+    expect(document.querySelectorAll(".status-actions")).toHaveLength(1);
+    const bar = group();
+    expect(bar.classList.contains("status-bar")).toBe(true);
+    expect(within(bar).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Mark reviewed",
+      "Mark actioned",
+      "Mark ignored",
+      "Mark new",
+    ]);
+    // The bar is the last block of the page, after the footer.
+    expect(document.querySelector(".detail")?.lastElementChild).toBe(bar);
+  });
+
+  it("the current status is disabled in the sticky bar", async () => {
+    setup(detail({ status: "ignored" }));
+    await screen.findByText("Message fb_1");
+    const disabled = within(group())
+      .getAllByRole("button")
+      .filter((b) => (b as HTMLButtonElement).disabled)
+      .map((b) => b.textContent);
+    expect(disabled).toEqual(["Mark ignored"]);
+  });
+
+  it("the sticky bar shows Next when a next item exists", async () => {
+    openFromList(detail(), { next: true });
+    await screen.findByText("Message fb_1");
+    const next = within(group()).getByRole("button", { name: "Next" });
+    expect(next).toBeTruthy();
+    expect(group().classList.contains("status-bar-solo")).toBe(false);
+    // The top pager still has its own Next.
+    expect(screen.getAllByRole("button", { name: "Next" })).toHaveLength(2);
+  });
+
+  it("the sticky bar has no Next without a next item", async () => {
+    openFromList(detail(), { next: false });
+    await screen.findByText("Message fb_1");
+    expect(within(group()).queryByRole("button", { name: "Next" })).toBeNull();
+    expect(group().classList.contains("status-bar-solo")).toBe(true);
+    expect(within(group()).getAllByRole("button")).toHaveLength(4);
+  });
+
+  it("the sticky bar holds the only primary button", async () => {
+    setup(detail({ status: "reviewed" }));
+    await screen.findByText("Message fb_1");
+    const primaries = document.querySelectorAll(".btn-primary");
+    expect(primaries).toHaveLength(1);
+    expect(group().contains(primaries[0] ?? null)).toBe(true);
+    expect(primaries[0]?.textContent).toBe("Mark actioned");
+  });
+
+  it("detail meta has no separator text", async () => {
+    restore();
+    restore = mockMatchMedia(false);
+    setup(detail({ userId: "usr_8f2a91", platform: "ios", appVersion: "2.4.1" }));
+    await screen.findByText("Message fb_1");
+    const meta = document.querySelector(".detail-meta") as HTMLElement;
+    expect(meta.tagName).toBe("UL");
+    const walker = document.createTreeWalker(meta, NodeFilter.SHOW_TEXT);
+    const texts: string[] = [];
+    for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) texts.push(n.textContent ?? "");
+    expect(texts.length).toBeGreaterThan(4);
+    for (const t of texts) expect(/^\s*\u00b7\s*$/.test(t)).toBe(false);
+    expect(meta.textContent).not.toContain("\u00b7");
+    // Desktop: the status buttons are inline, not a fixed bar.
+    expect(document.querySelector(".status-bar")).toBeNull();
   });
 });

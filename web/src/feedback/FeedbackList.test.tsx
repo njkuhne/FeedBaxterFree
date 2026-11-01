@@ -1,9 +1,10 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { createRef } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Feedback, Filters } from "../lib/types";
 import { FeedbackList } from "./FeedbackList";
 import { fb, mockApi, renderPage, type Call, type Answer } from "./testHelpers";
+import { mockMatchMedia } from "../test-media";
 import { clearFeedbackCache } from "./useFeedbackList";
 
 const filters: Filters = { status: "new", tag: "", channel: "", q: "", userId: "" };
@@ -406,5 +407,101 @@ describe("FeedbackList", () => {
     await screen.findAllByText("Restored tag bug on 2 items.");
     expect(calls.find((c) => c.path === "/api/feedback/add-tags")?.body).toEqual({ ids: ["fb_3", "fb_2"], tags: ["bug"] });
     await waitFor(() => expect(screen.getAllByRole("link", { name: "Filter by tag bug" })).toHaveLength(2));
+  });
+});
+
+describe("FeedbackList on a narrow screen", () => {
+  let restore: () => void = () => undefined;
+  beforeEach(() => {
+    restore = mockMatchMedia(true);
+  });
+  afterEach(() => restore());
+
+  const checkboxes = () => document.querySelectorAll(".rows input[type=checkbox]");
+
+  it("narrow list hides row checkboxes and select-all outside Select mode", async () => {
+    api();
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    expect(checkboxes()).toHaveLength(0);
+    expect(screen.queryByLabelText("Select all on this page")).toBeNull();
+    expect(screen.getByRole("button", { name: "Select" })).toBeTruthy();
+    expect(document.querySelectorAll(".row-narrow")).toHaveLength(3);
+    // The time is in the meta line, once per row.
+    expect(document.querySelectorAll(".row-meta time")).toHaveLength(3);
+    expect(document.querySelectorAll("time")).toHaveLength(3);
+  });
+
+  it("Select shows the checkboxes and select-all", async () => {
+    api();
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    expect(checkboxes()).toHaveLength(3);
+    expect(screen.getByLabelText("Select all on this page")).toBeTruthy();
+    expect(screen.getByText("Select items")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Select" })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(checkboxes()[0]));
+  });
+
+  it("selecting rows in Select mode shows the bulk bar", async () => {
+    api();
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(screen.getByLabelText("Select: Third"));
+    fireEvent.click(screen.getByLabelText("Select: Second"));
+    expect(await screen.findByText("2 selected")).toBeTruthy();
+    expect(screen.getByRole("toolbar", { name: "Bulk actions" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mark reviewed" })).toBeTruthy();
+    // Done replaces Clear.
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+
+  it("Done clears the selection and leaves Select mode", async () => {
+    api();
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(screen.getByLabelText("Select: Third"));
+    await screen.findByText("1 selected");
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByText("1 selected")).toBeNull();
+    expect(checkboxes()).toHaveLength(0);
+    const select = screen.getByRole("button", { name: "Select" });
+    await waitFor(() => expect(document.activeElement).toBe(select));
+  });
+
+  it("x on narrow enters Select mode", async () => {
+    api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    expect(checkboxes()).toHaveLength(0);
+    third.focus();
+    fireEvent.keyDown(third, { key: "x" });
+    expect(await screen.findByText("1 selected")).toBeTruthy();
+    expect(checkboxes()).toHaveLength(3);
+    fireEvent.keyDown(third, { key: "Escape" });
+    await waitFor(() => expect(checkboxes()).toHaveLength(0));
+    expect(screen.queryByText("1 selected")).toBeNull();
+  });
+
+  it("select all matching is not offered on narrow", async () => {
+    const make = (from: number, n: number) =>
+      Array.from({ length: n }, (_, i) => fb({ id: `fb_${String(1000 - from - i).padStart(4, "0")}`, message: `Msg ${from + i}` }));
+    mockApi((c) => {
+      if (c.method === "GET" && c.path.startsWith("/api/feedback")) return { body: { items: make(0, 50), nextCursor: "50" } };
+      return undefined;
+    });
+    renderPage(
+      <FeedbackList filters={filters} showChannel={false} origin="inbox" originLabel="Inbox" count={600} renderEmpty={() => <p>Nothing here</p>} />,
+    );
+    await screen.findByRole("link", { name: "Msg 0" });
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    expect(await screen.findByText("50 selected")).toBeTruthy();
+    expect(screen.queryByText(/on this page are selected/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /matching/ })).toBeNull();
   });
 });

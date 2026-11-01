@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { loginUrl } from "../lib/next";
+import { useNarrow } from "../lib/useMediaQuery";
 import { Rail } from "./Rail";
+import { TopBar } from "./TopBar";
 import { useAuth } from "./AuthProvider";
 import NotFound from "../pages/NotFound";
 
@@ -18,13 +20,14 @@ export function RequireAuth() {
 }
 
 function Shell() {
+  const narrow = useNarrow();
   return (
     <>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
       <div className="shell">
-        <Rail />
+        {narrow ? <TopBar /> : <Rail />}
         <main id="main" tabIndex={-1} className="content">
           <Outlet />
         </main>
