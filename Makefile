@@ -4,7 +4,7 @@ DOCKER_RUN  = docker run --rm -v "$(CURDIR)":/src -v fbx-gomodcache:/go/pkg/mod 
               -v fbx-gobuildcache:/root/.cache/go-build -w /src \
               -e CGO_ENABLED=0 -e GOTOOLCHAIN=local -e GOFLAGS=-buildvcs=false \
               -e GOOS -e GOARCH -e TEST_DATABASE_URL $(DOCKER_EXTRA) $(GO_IMAGE)
-# CI sets GO=go to use a native toolchain.
+# Set GO=go to use a native toolchain instead of Docker.
 GO         ?= $(DOCKER_RUN) go
 LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxterfree.Version=$(VERSION)
 # 32 MiB.
@@ -22,9 +22,12 @@ COMPOSE_DEV = docker compose -f deploy/compose.dev.yml
 HOST_GOOS   = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 HOST_GOARCH = $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 
-.PHONY: help build dev test test-pg vet lint image size-check clean ui dev-ui sdk-web local
+.PHONY: help build dev test test-pg vet lint image size-check clean ui dev-ui sdk-web local check
 
 .DEFAULT_GOAL := help
+
+check: ## Everything that must be green before a merge: vet ui sdk-web test test-pg size-check image rss-check
+	@for t in vet ui sdk-web test test-pg size-check image rss-check; do echo "== make $$t"; $(MAKE) --no-print-directory $$t || exit 1; done; echo "check: ok"
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'

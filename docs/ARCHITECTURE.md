@@ -240,7 +240,7 @@ Anything else needs an ADR. Test helpers use the standard library only.
 - No Go on the dev machine. `make` targets run `docker run --rm -v $(PWD):/src -v fbx-gomodcache:/go/pkg/mod -w /src golang:1.27-alpine …`. Targets: `build`, `test`, `test-pg`, `lint` (`go vet`), `image`, `size-check`, `rss-check`, `ui`, `dev`.
 - `make test` runs `go test ./...` with SQLite in-process and an embedded NATS per test package (fast, no containers). `make test-pg` starts Postgres from `deploy/compose.dev.yml` and runs the store and API tests again with `TEST_DATABASE_URL`.
 - Every store and API test is written once and parameterised over both dialects via a `storetest.ForEachDialect(t, func(t *testing.T, db *store.DB))` helper that skips Postgres when `TEST_DATABASE_URL` is unset.
-- `make image` builds `deploy/Dockerfile` (multi-stage: node for `web/`, golang for the binary, `scratch` for the final image with `ca-certificates` and a non-root user). `make size-check` fails if the binary exceeds 32 MiB; `make rss-check` boots the image, signs in once and fails if the process RSS exceeds 48 MiB. CI runs both.
+- `make image` builds `deploy/Dockerfile` (multi-stage: node for `web/`, golang for the binary, `scratch` for the final image with `ca-certificates` and a non-root user). `make size-check` fails if the binary exceeds 32 MiB; `make rss-check` boots the image, signs in once and fails if the process RSS exceeds 48 MiB. `make check` runs both.
 - UI: Vite, React, TypeScript, no component library, no CSS framework; design tokens in one CSS file from the Styleguide. Fonts subset at build time into `web/public/fonts`.
 
 ## 14. Milestones

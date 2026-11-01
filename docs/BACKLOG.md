@@ -11,7 +11,7 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 | `/api/ops` returns 500 when NATS is unreachable | M2 | Should report an "unavailable" queue section instead. Do with the ops page in M3. |
 | Concurrent deletion of the last two channels on Postgres | M2 | Both could pass the "keep one channel" check. Row-lock like the last-admin rule. |
 | `ingest` mode against an external NATS is untested | M1 | Embedded tests use `DontListen`. Cover in the M6 SaaS deployment work with compose.dev.yml's nats service. |
-| Race detector never run | M1 | `CGO_ENABLED=0` in the container rules out `-race`. Add a CI job with a CGO-enabled toolchain. |
+| Race detector never run | M1 | `CGO_ENABLED=0` in the container rules out `-race`. Run it occasionally with a CGO-enabled toolchain. |
 | Per-tenant in-flight cap on the queue | M1 | The stream cap is global; the daily cap and rate limit are the fuse. Revisit for SaaS. |
 | New tenants' counters start at 0 until the first flush | M1 | Within the documented overshoot bound; `KeyWriter.SyncTenant` scans every KV key, fine for self-host, needs an index at SaaS scale. |
 | SaaS Authenticator needs password helpers | M2 | `ext` exposes no password hashing; the private repo must use argon2id with the same PHC format, or `ext` grows a `PasswordHasher` in M6. |

@@ -42,7 +42,7 @@ Feedback flows left to right and is written only by processors. The BFF writes e
 | `api` | BFF, admin UI, MCP server | In-process | Own deployment |
 | `all` | Every mode plus embedded NATS | Default | Not used |
 
-**Footprint targets (measured, see `docs/REVIEW.md`):** a static binary in a scratch image of at most 32 MB, idling at no more than 48 MB of RAM, both checked in CI. The React admin UI is compiled in with `go:embed`.
+**Footprint targets (measured, see `docs/REVIEW.md`):** a static binary in a scratch image of at most 32 MB, idling at no more than 48 MB of RAM, both checked by `make check`. The React admin UI is compiled in with `go:embed`.
 
 **Tenancy:** the core talks to a `TenantResolver` interface. Self-host's resolver always returns the single tenant; the multi-tenant resolver lives in the private SaaS layer, which imports the public module (see Open source and licensing).
 

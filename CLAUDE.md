@@ -10,7 +10,7 @@ One-way app feedback capture: an ingest API, SDKs for web and iOS/macOS, an admi
 - NATS JetStream queue (embedded in-process for self-host, standalone for SaaS); NATS KV for the ingest key cache (`keys` bucket, watched by ingest) and quota counters.
 - SQLite for self-host, Postgres for SaaS. Same schema and migrations; every table has `tenant_id`.
 - React admin UI, compiled into the binary with `go:embed`.
-- Self-host ships as a single Docker service (scratch image, binary ≤ 32 MB, ≤ 48 MB RAM idle, both measured in CI).
+- Self-host ships as a single Docker service (scratch image, binary ≤ 32 MB, ≤ 48 MB RAM idle, both measured by `make check`).
 - Toolchain: Go is not installed on the dev Mac. Everything runs through `make` targets that use the official `golang` Docker image with `CGO_ENABLED=0`; Postgres for tests comes from `docker compose`.
 
 ## Non-negotiables
@@ -33,5 +33,5 @@ Follow the Styleguide section of `docs/SPEC.md` exactly: the oat and dusk palett
 
 - Build in the order of the v1 checklist in `docs/SPEC.md`, starting with the ingest → queue → processor pipeline.
 - Keep dependencies minimal; prefer the Go standard library. The allowed Go dependencies are listed in `docs/ARCHITECTURE.md`; adding one needs an ADR.
-- Roles on this build: Fable owns architecture and milestone acceptance, Opus writes component design briefs (`docs/design/`) and reviews every diff, Sonnet implements one brief at a time. Nothing merges without an Opus review and green tests on SQLite and Postgres.
+- Roles on this build: Fable owns architecture and milestone acceptance, Opus writes component design briefs (`docs/design/`) and reviews every diff, Sonnet implements one brief at a time. Nothing merges without an Opus review and a green `make check` (vet, tests on SQLite and Postgres, UI, SDK, size and memory) run locally. There is no hosted CI, by decision.
 - Write tests for the ingest pipeline: cap enforcement, queue-full behaviour, idempotent processing.

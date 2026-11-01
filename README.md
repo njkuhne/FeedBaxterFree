@@ -47,6 +47,7 @@ make vet         # go vet
 make image       # scratch Docker image, feedbaxter:latest
 make size-check  # fail if a linux binary exceeds 32 MiB
 make rss-check   # boot the image, sign in, fail if RSS exceeds 48 MiB
+make check       # all of the above, the gate before a merge (there is no hosted CI)
 make local       # native image on localhost:8095 with a persistent volume
 ```
 

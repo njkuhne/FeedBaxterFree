@@ -24,7 +24,7 @@ I measured this rather than guess. Docker, Go 1.27.3, `CGO_ENABLED=0`, `-s -w -t
 
 Adding pgx, the MCP SDK, the React bundle, subset fonts and our own code puts the shipped binary at roughly 28–32 MB and idle RSS at roughly 35–45 MB with the HTTP servers up. That overshoots the spec's 15–25 MB and 20–30 MB by a margin that does not matter on any VM, and in exchange self-host runs the exact ingest, queue and processor code SaaS runs, including queue-full and redelivery behaviour.
 
-**Decision: keep embedded JetStream. Set the targets to binary ≤ 32 MB and idle RSS ≤ 48 MB, and measure both in CI.** The alternative, a SQLite-backed queue for self-host only, would save about 10 MB of binary and 15 MB of RAM in exchange for a second queue implementation to test and a standing source of "works on self-host, breaks on SaaS" bugs. Not worth it.
+**Decision: keep embedded JetStream. Set the targets to binary ≤ 32 MB and idle RSS ≤ 48 MB, and measure both in `make check`.** The alternative, a SQLite-backed queue for self-host only, would save about 10 MB of binary and 15 MB of RAM in exchange for a second queue implementation to test and a standing source of "works on self-host, breaks on SaaS" bugs. Not worth it.
 
 The throughput numbers also settle where the load goes: the processor drains two hundred thousand messages a second on one core, so it is never the bottleneck. HTTP handling at ingest is, and ingest is stateless and scales by replica.
 

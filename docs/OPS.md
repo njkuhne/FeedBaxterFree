@@ -23,7 +23,7 @@ Ingest is bounded by HTTP handling plus the synchronous publish to the stream. T
 
 ## Footprint
 
-Measured on the same host with `make size-check` and `make rss-check`, which CI runs on every push.
+Measured on the same host with `make size-check` and `make rss-check`, which `make check` runs before every merge.
 
 | Measurement | Result | Limit |
 | --- | --- | --- |
