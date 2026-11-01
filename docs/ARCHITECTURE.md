@@ -183,7 +183,7 @@ Schema is the spec's data model table. Indexes: `(tenant_id, status, received_at
 
 - `net/http` with Go 1.22+ patterns. JSON in and out. Every handler gets a `Principal` from the `Authenticator` or returns `401`.
 - Sessions: `sessions` table (id, user_id, expires_at, created_at); cookie `fb_session`, `HttpOnly`, `Secure` when the request is HTTPS, `SameSite=Lax`, 30-day expiry sliding. Mutating requests require `Sec-Fetch-Site` of `same-origin`/`none` or an `X-Requested-With` header; otherwise `403`.
-- Passwords: argon2id (`golang.org/x/crypto/argon2`), parameters t=1, m=64 MiB, p=4, 16-byte salt, encoded PHC string.
+- Passwords: argon2id (`golang.org/x/crypto/argon2`), OWASP profile t=2, m=19 MiB, p=1, 16-byte salt, encoded PHC string; parameters are read back from the string, so hashes from the earlier 64 MiB profile still verify. At most two hashes run at once and the working set is returned to the OS after each one (`debug.FreeOSMemory`), otherwise one hash raises the GC heap goal above 128 MB and the process keeps that memory for minutes.
 - Business rules live in `internal/service`; every method that takes a principal starts with `requireUser` or `requireAdmin`, and `requireAdmin` is the only role check. `internal/api` only maps HTTP to service calls and errors, so the MCP server reuses the same checks.
 - Export: streams CSV or JSON from a cursor, honours the inbox filter parameters.
 - Ops endpoint `/api/ops`: queue depth, oldest message age, DLQ count, counter snapshot, DB size (admin only).
@@ -237,10 +237,10 @@ Anything else needs an ADR. Test helpers use the standard library only.
 
 ## 13. Toolchain and testing
 
-- No Go on the dev machine. `make` targets run `docker run --rm -v $(PWD):/src -v fbx-gomodcache:/go/pkg/mod -w /src golang:1.27-alpine …`. Targets: `build`, `test`, `test-pg`, `lint` (`go vet`), `image`, `size-check`, `ui`, `dev`.
+- No Go on the dev machine. `make` targets run `docker run --rm -v $(PWD):/src -v fbx-gomodcache:/go/pkg/mod -w /src golang:1.27-alpine …`. Targets: `build`, `test`, `test-pg`, `lint` (`go vet`), `image`, `size-check`, `rss-check`, `ui`, `dev`.
 - `make test` runs `go test ./...` with SQLite in-process and an embedded NATS per test package (fast, no containers). `make test-pg` starts Postgres from `deploy/compose.dev.yml` and runs the store and API tests again with `TEST_DATABASE_URL`.
 - Every store and API test is written once and parameterised over both dialects via a `storetest.ForEachDialect(t, func(t *testing.T, db *store.DB))` helper that skips Postgres when `TEST_DATABASE_URL` is unset.
-- `make image` builds `deploy/Dockerfile` (multi-stage: node for `web/`, golang for the binary, `scratch` for the final image with `ca-certificates` and a non-root user). `make size-check` fails if the binary exceeds 32 MB.
+- `make image` builds `deploy/Dockerfile` (multi-stage: node for `web/`, golang for the binary, `scratch` for the final image with `ca-certificates` and a non-root user). `make size-check` fails if the binary exceeds 32 MiB; `make rss-check` boots the image, signs in once and fails if the process RSS exceeds 48 MiB. CI runs both.
 - UI: Vite, React, TypeScript, no component library, no CSS framework; design tokens in one CSS file from the Styleguide. Fonts subset at build time into `web/public/fonts`.
 
 ## 14. Milestones

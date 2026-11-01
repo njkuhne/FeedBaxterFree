@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"unicode/utf8"
 
@@ -12,9 +13,12 @@ import (
 )
 
 const (
-	argonTime    = 1
-	argonMemory  = 64 * 1024 // KiB
-	argonThreads = 4
+	// OWASP's recommended argon2id profile (m=19 MiB, t=2, p=1). The 64 MiB
+	// profile hashed just as well but each hash set the GC heap goal to over
+	// 128 MB, which the runtime then kept resident for minutes.
+	argonTime    = 2
+	argonMemory  = 19 * 1024 // KiB
+	argonThreads = 1
 	argonKeyLen  = 32
 	argonSaltLen = 16
 
@@ -25,14 +29,21 @@ const (
 	tempPasswordAlphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 )
 
-// argonSem bounds concurrent argon2 calls: 64 MiB each must not blow the idle
-// memory budget under a login flood.
+// argonSem bounds concurrent argon2 calls: the working set of each must not
+// blow the idle memory budget under a login flood.
 var argonSem = make(chan struct{}, 2)
 
+// argonKey runs argon2id and then hands the working set straight back to the
+// OS. Without that, one hash (19 MiB here, 64 MiB for hashes from older
+// installs) doubles the GC heap goal and the process holds the memory for
+// minutes; with a live heap of a few MB the forced collection costs well
+// under a millisecond.
 func argonKey(pw string, salt []byte, t, m uint32, p uint8, n uint32) []byte {
 	argonSem <- struct{}{}
-	defer func() { <-argonSem }()
-	return argon2.IDKey([]byte(pw), salt, t, m, p, n)
+	key := argon2.IDKey([]byte(pw), salt, t, m, p, n)
+	<-argonSem
+	debug.FreeOSMemory()
+	return key
 }
 
 var b64 = base64.RawStdEncoding

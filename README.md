@@ -46,6 +46,7 @@ make test-pg     # test suite against Postgres (starts and removes a container)
 make vet         # go vet
 make image       # scratch Docker image, feedbaxter:latest
 make size-check  # fail if a linux binary exceeds 32 MiB
+make rss-check   # boot the image, sign in, fail if RSS exceeds 48 MiB
 ```
 
 Run `make help` for the full list.

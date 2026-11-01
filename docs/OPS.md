@@ -21,6 +21,19 @@ Command (inside the Go container, three runs each):
 
 Ingest is bounded by HTTP handling plus the synchronous publish to the stream. The processor is bounded by database write speed (SQLite allows one writer), which is why batching helps. The queue between them absorbs bursts: ingest can run faster than the processor until the stream reaches its cap. The benchmark disables the per-key rate limit; with the default (60 per 10 s) one key is held to about 6 requests per second.
 
+## Footprint
+
+Measured on the same host with `make size-check` and `make rss-check`, which CI runs on every push.
+
+| Measurement | Result | Limit |
+| --- | --- | --- |
+| Binary, linux/amd64 | 27.6 MB | 32 MiB |
+| Binary, linux/arm64 | 25.8 MB | 32 MiB |
+| Docker image | 37.8 MB | |
+| Process RSS after first boot and one login (`all` mode, SQLite, embedded JetStream, UI and MCP mounted) | 37 MB, of which about 20 MB is the binary's own mapped pages | 48 MiB |
+
+Memory stays flat at idle. A password hash (login, password change, creating or resetting a user) briefly needs 19 MiB, at most two at a time, and that memory is handed back to the OS as soon as the hash completes. Installs that created users before the 19 MiB profile hold hashes from the 64 MiB profile; those keep verifying, cost 64 MiB during that one login, and are not rewritten. A burst of 50,000 queued messages can take RSS to roughly 90 MB while the file store's cache is warm; it settles afterwards.
+
 ## Queue objects
 
 The embedded NATS store lives in `$DATA_DIR/nats`. It must be on the same persistent volume as the SQLite file; losing it drops queued, unprocessed feedback.

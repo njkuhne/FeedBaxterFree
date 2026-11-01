@@ -9,6 +9,8 @@ GO         ?= $(DOCKER_RUN) go
 LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxter.Version=$(VERSION)
 # 32 MiB.
 SIZE_LIMIT ?= 33554432
+# 48 MiB.
+RSS_LIMIT  ?= 50331648
 DEV_PORT   ?= 8090
 # Data directory for make dev, relative to the repo (a second dev server needs its own).
 DEV_DATA   ?= data
@@ -58,6 +60,21 @@ lint: vet ## Alias for vet
 
 image: ## Build the scratch Docker image (UI included)
 	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) -t feedbaxter:$(VERSION) -t feedbaxter:latest .
+
+rss-check: ## Fail if the image's RSS, measured after a first boot and a login, exceeds RSS_LIMIT
+	@c=fbx-rss-$$$$; \
+	docker run -d --rm --name $$c -p 127.0.0.1:0:8080 feedbaxter:latest >/dev/null; \
+	trap 'docker rm -f '$$c' >/dev/null 2>&1' EXIT; \
+	port=$$(docker port $$c 8080 | head -1 | sed 's/.*://'); \
+	for i in $$(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:$$port/readyz && break; sleep 1; done; \
+	pw=$$(docker logs $$c 2>&1 | sed -n 's/.*temporary password: \([A-Za-z0-9]*\).*/\1/p' | head -1); \
+	curl -sf -o /dev/null -H 'X-Requested-With: fetch' -H 'Content-Type: application/json' \
+	  -d "{\"email\":\"admin@localhost\",\"password\":\"$$pw\"}" http://127.0.0.1:$$port/api/auth/login \
+	  || { echo "rss-check: login failed"; exit 1; }; \
+	sleep 5; \
+	kb=$$(docker run --rm --pid=container:$$c alpine:3.21 awk '/^VmRSS/{print $$2}' /proc/1/status); \
+	echo "RSS after first boot and login: $$kb kB ($$(awk -v k=$$kb 'BEGIN{printf "%.1f", k/1024}') MB)"; \
+	[ "$$kb" -gt 0 ] && [ $$((kb*1024)) -le $(RSS_LIMIT) ] || { echo "RSS exceeds $(RSS_LIMIT) bytes"; exit 1; }
 
 size-check: build ## Fail if a linux binary exceeds SIZE_LIMIT
 	@status=0; \

@@ -14,7 +14,7 @@ import (
 func TestPasswordHashRoundTrip(t *testing.T) {
 	h, err := HashPassword("a long enough password")
 	mustNil(t, err)
-	if !regexp.MustCompile(`^\$argon2id\$v=19\$m=65536,t=1,p=4\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{43}$`).MatchString(h) {
+	if !regexp.MustCompile(`^\$argon2id\$v=19\$m=19456,t=2,p=1\$[A-Za-z0-9+/]{22}\$[A-Za-z0-9+/]{43}$`).MatchString(h) {
 		t.Fatalf("not PHC: %q", h)
 	}
 	if !VerifyPassword(h, "a long enough password") {
@@ -34,6 +34,13 @@ func TestPasswordHashRoundTrip(t *testing.T) {
 	phc := "$argon2id$v=19$m=8192,t=2,p=2$" + b64.EncodeToString(salt) + "$" + b64.EncodeToString(key)
 	if !VerifyPassword(phc, "pw") || VerifyPassword(phc, "px") {
 		t.Fatal("parameters not parsed from the string")
+	}
+	// Hashes written by installs before the 19 MiB profile (m=64 MiB, t=1, p=4)
+	// must keep verifying.
+	key = argonKey("pw", salt, 1, 64*1024, 4, 32)
+	phc = "$argon2id$v=19$m=65536,t=1,p=4$" + b64.EncodeToString(salt) + "$" + b64.EncodeToString(key)
+	if !VerifyPassword(phc, "pw") || VerifyPassword(phc, "px") {
+		t.Fatal("legacy 64 MiB hash does not verify")
 	}
 	h2, _ := HashPassword("a long enough password")
 	if h == h2 {
