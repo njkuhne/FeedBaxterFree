@@ -166,11 +166,13 @@ Retention: a jittered ticker (`RETENTION_CHECK_INTERVAL`, default `1h`) in every
 ## 8. Store
 
 - `store.Open(cfg)` returns `*store.DB{SQL *sql.DB, Dialect}`; SQLite driver `modernc.org/sqlite` with `_pragma=journal_mode(WAL)`, `synchronous(NORMAL)`, `busy_timeout(5000)`, `foreign_keys(ON)`; Postgres via `pgx/v5/stdlib`.
-- Migrations: embedded `.sql` files `NNNN_name.sqlite.sql` and `NNNN_name.postgres.sql` only where the dialects differ; otherwise a single `NNNN_name.sql`. A `schema_migrations` table records versions. Extensions append their own files in a separate version namespace (`ext_NNNN_…`).
+- Migrations: embedded `.sql` files `NNNN_name.sqlite.sql` and `NNNN_name.postgres.sql` only where the dialects differ; otherwise a single `NNNN_name.sql` in which the token `{{json}}` expands to the dialect's JSON column type. Each migration runs in its own transaction with its `schema_migrations` row; on Postgres an advisory lock serialises replicas that start together. A `schema_migrations` table records versions. Extensions append their own files in a separate version namespace (`ext_NNNN_…`).
 - Dialect shim, and nothing more: placeholder rewrite (`?` → `$n`), `JSON` column type (`TEXT` vs `JSONB`), `NOW()` vs `CURRENT_TIMESTAMP`, `INSERT … RETURNING` is supported by both.
 - Queries are hand-written functions per entity in `internal/store/<entity>.go`, taking `context.Context` and a `Querier` (so they run in or out of a transaction).
-- IDs: 20-char random base32 strings generated in Go with a short type prefix (`fb_`, `ch_`, `us_`, `tn_`, `ky_`, `tk_`, `tg_`), `TEXT PRIMARY KEY` in both databases. No autoincrement, no UUID type dependency.
-- Timestamps: `INTEGER` Unix milliseconds in both databases, converted in Go. One representation, no timezone bugs.
+- IDs: 20-char random base32 strings generated in Go with a short type prefix (`tn_`, `us_`, `ch_`, `ky_`, `tk_`, `fb_`, `tg_`, `sc_` for status changes), `TEXT PRIMARY KEY` in both databases. No autoincrement, no UUID type dependency.
+- Timestamps: `BIGINT` Unix milliseconds in both databases (Postgres `INTEGER` is 32-bit; SQLite treats `BIGINT` as integer affinity), converted in Go. One representation, no timezone bugs. Booleans are `INTEGER` 0/1.
+- The `plans` table is SaaS-only and lives in an extension migration (`ext_NNNN_…`); `tenants.plan_id` is a nullable `TEXT` with no foreign key.
+- `feedback.channel_id` has no foreign key: a batch must never fail because a channel was deleted between ingest and insert. What channel deletion does to existing feedback is decided in M2.
 
 Schema is the spec's data model table. Indexes: `(tenant_id, status, received_at DESC)`, `(tenant_id, channel_id, received_at DESC)`, `(tenant_id, user_id)`, unique `(tenant_id, idempotency_key)`, unique `(tenant_id, name)` on tags and on channels.
 

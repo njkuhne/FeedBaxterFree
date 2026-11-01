@@ -1,0 +1,61 @@
+GO_IMAGE   ?= golang:1.27-alpine
+VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+DOCKER_RUN  = docker run --rm -v "$(CURDIR)":/src -v fbx-gomodcache:/go/pkg/mod \
+              -v fbx-gobuildcache:/root/.cache/go-build -w /src \
+              -e CGO_ENABLED=0 -e GOTOOLCHAIN=local -e GOFLAGS=-buildvcs=false \
+              -e GOOS -e GOARCH -e TEST_DATABASE_URL $(DOCKER_EXTRA) $(GO_IMAGE)
+# CI sets GO=go to use a native toolchain.
+GO         ?= $(DOCKER_RUN) go
+LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxter.Version=$(VERSION)
+# 32 MiB.
+SIZE_LIMIT ?= 33554432
+PG_URL_DEV  = postgres://feedbaxter:feedbaxter@postgres:5432/feedbaxter_test?sslmode=disable
+COMPOSE_DEV = docker compose -f deploy/compose.dev.yml
+
+HOST_GOOS   = $(shell uname -s | tr '[:upper:]' '[:lower:]')
+HOST_GOARCH = $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
+
+# The `ui` target arrives in M3 (web/ does not exist yet) and `dev` in M1 (no pipeline to run yet).
+
+.PHONY: help build test test-pg vet lint image size-check clean
+
+.DEFAULT_GOAL := help
+
+help: ## List targets
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
+
+build: ## Build bin/feedbaxter (host) and linux amd64/arm64 binaries
+	GOOS=linux GOARCH=amd64 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/feedbaxter-linux-amd64 ./cmd/feedbaxter
+	GOOS=linux GOARCH=arm64 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/feedbaxter-linux-arm64 ./cmd/feedbaxter
+	GOOS=$(HOST_GOOS) GOARCH=$(HOST_GOARCH) $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/feedbaxter ./cmd/feedbaxter
+
+test: ## Run the test suite (SQLite)
+	$(GO) test -count=1 ./...
+
+test-pg: ## Run the test suite against Postgres from deploy/compose.dev.yml
+	$(COMPOSE_DEV) up -d --wait postgres || { $(COMPOSE_DEV) down -v; exit 1; }; \
+	TEST_DATABASE_URL='$(PG_URL_DEV)' $(MAKE) test DOCKER_EXTRA=--network=feedbaxter-dev_default; \
+	status=$$?; \
+	$(COMPOSE_DEV) down -v; \
+	exit $$status
+
+vet: ## Run go vet
+	$(GO) vet ./...
+
+lint: vet ## Alias for vet
+
+image: ## Build the scratch Docker image
+	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) -t feedbaxter:$(VERSION) -t feedbaxter:latest .
+
+size-check: build ## Fail if a linux binary exceeds SIZE_LIMIT
+	@status=0; \
+	for f in bin/feedbaxter-linux-amd64 bin/feedbaxter-linux-arm64; do \
+	  bytes=$$(wc -c < $$f | tr -d ' '); \
+	  mb=$$(awk -v b=$$bytes 'BEGIN{printf "%.1f", b/1048576}'); \
+	  echo "$$f: $$bytes bytes ($$mb MB)"; \
+	  if [ $$bytes -gt $(SIZE_LIMIT) ]; then echo "$$f exceeds $(SIZE_LIMIT) bytes"; status=1; fi; \
+	done; \
+	exit $$status
+
+clean: ## Remove build output
+	rm -rf bin

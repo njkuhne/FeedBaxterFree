@@ -1,0 +1,24 @@
+name: feedbaxter-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: feedbaxter
+      POSTGRES_PASSWORD: feedbaxter
+      POSTGRES_DB: feedbaxter_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U feedbaxter -d feedbaxter_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  nats:
+    image: nats:2.15-alpine
+    command: ["-js", "-sd", "/data"]
+    tmpfs:
+      - /data

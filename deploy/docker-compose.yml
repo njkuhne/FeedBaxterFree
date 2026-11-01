@@ -1,0 +1,17 @@
+services:
+  feedbaxter:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: feedbaxter:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - feedbaxter-data:/data
+    env_file:
+      - path: ../.env
+        required: false
+    restart: unless-stopped
+
+volumes:
+  feedbaxter-data:
