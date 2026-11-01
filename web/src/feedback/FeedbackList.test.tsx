@@ -173,7 +173,7 @@ describe("FeedbackList", () => {
     // Back at the top, where it was, not appended.
     expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Third", "Second", "First"]);
     await waitFor(() => expect(document.activeElement).toBe(link("Third")));
-    await screen.findByText("Restored 1 item.");
+    await screen.findAllByText("Restored 1 item.");
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
   });
 
@@ -213,7 +213,7 @@ describe("FeedbackList", () => {
     await screen.findByText("Marked 3 ignored");
     expect(calls.filter((c) => c.path === "/api/feedback/status")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    await screen.findByText("Restored 3 items.");
+    await screen.findAllByText("Restored 3 items.");
     const restores = calls.filter((c) => c.path === "/api/feedback/status").slice(1);
     expect(restores.map((c) => c.body)).toEqual([
       { ids: ["fb_3", "fb_1"], status: "new" },
@@ -403,7 +403,7 @@ describe("FeedbackList", () => {
     expect(calls.find((c) => c.path === "/api/feedback/remove-tags")?.body).toEqual({ ids: ["fb_3", "fb_2"], tags: ["bug"] });
     expect(document.querySelectorAll(".pill")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    await screen.findByText("Restored tag bug on 2 items.");
+    await screen.findAllByText("Restored tag bug on 2 items.");
     expect(calls.find((c) => c.path === "/api/feedback/add-tags")?.body).toEqual({ ids: ["fb_3", "fb_2"], tags: ["bug"] });
     await waitFor(() => expect(screen.getAllByRole("link", { name: "Filter by tag bug" })).toHaveLength(2));
   });

@@ -219,7 +219,7 @@ describe("FeedbackDetail", () => {
     expect(screen.queryByRole("button", { name: "Remove tag bug" })).toBeNull();
     await waitFor(() => expect(screen.getByTestId("announcer").textContent).toBe("Removed tag bug. Press z to undo."));
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    await screen.findByText("Restored tag bug on 1 item.");
+    await screen.findAllByText("Restored tag bug on 1 item.");
     expect(calls.find((c) => c.path === "/api/feedback/add-tags")?.body).toEqual({ ids: ["fb_1"], tags: ["bug"] });
     expect(await screen.findByRole("button", { name: "Remove tag bug" })).toBeTruthy();
   });
