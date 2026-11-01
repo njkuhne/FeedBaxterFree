@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { defaultFilters, filtersFromQuery, filtersToQuery, toApiParams } from "./filters";
+import { fb } from "../feedback/testHelpers";
+import { defaultFilters, filtersFromQuery, filtersToQuery, matchesFilters, toApiParams } from "./filters";
 import type { Filters } from "./types";
 
 describe("filters", () => {
@@ -31,5 +32,27 @@ describe("filters", () => {
     const p = toApiParams({ ...defaultFilters, q: ` ${"a".repeat(300)} `, userId: "cust 1" });
     expect(p.get("q")).toHaveLength(200);
     expect(p.get("userId")).toBe("cust 1");
+  });
+});
+
+describe("matchesFilters", () => {
+  const item = fb({ id: "fb_1", status: "reviewed", tags: ["Bug", "ios"], channelId: "ch_1", userId: "cust-1", message: "The Export button is broken" });
+  const all: Filters = { ...defaultFilters, status: "all" };
+
+  it("matchesFilters covers status, tag, channel, userId and q", () => {
+    expect(matchesFilters(item, all)).toBe(true);
+    expect(matchesFilters(item, { ...all, status: "reviewed" })).toBe(true);
+    expect(matchesFilters(item, { ...all, status: "new" })).toBe(false);
+    expect(matchesFilters(item, { ...all, tag: "bug" })).toBe(true);
+    expect(matchesFilters(item, { ...all, tag: "crash" })).toBe(false);
+    expect(matchesFilters(item, { ...all, channel: "ch_1" })).toBe(true);
+    expect(matchesFilters(item, { ...all, channel: "ch_2" })).toBe(false);
+    expect(matchesFilters(item, { ...all, userId: "cust-1" })).toBe(true);
+    expect(matchesFilters(item, { ...all, userId: "cust-2" })).toBe(false);
+    expect(matchesFilters(item, { ...all, q: "  EXPORT " })).toBe(true);
+    expect(matchesFilters(item, { ...all, q: "import" })).toBe(false);
+    expect(matchesFilters(item, { ...all, q: "   " })).toBe(true);
+    expect(matchesFilters(item, { status: "reviewed", tag: "ios", channel: "ch_1", userId: "cust-1", q: "button" })).toBe(true);
+    expect(matchesFilters(fb({ id: "fb_2", tags: [] }), { ...all, tag: "bug" })).toBe(false);
   });
 });

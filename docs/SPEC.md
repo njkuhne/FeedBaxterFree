@@ -230,6 +230,8 @@ Muted, unbleached craft-paper tones with one dusky purple accent. Light mode onl
 | --- | --- | --- | --- |
 | Wordmark | Fraunces | 24 px, 400 | Ink |
 | Page title | Fraunces | 26–28 px, 400 | Ink |
+
+One exception: the feedback detail page has no visible page title. The customer's message is the most prominent thing on that screen, so its heading is visually hidden and the message leads (decided in the November 2026 UX review, `docs/design/ux-review/VERDICT.md`).
 | Feedback message | Inter | 16.5 px, 400, line height 1.65 | Ink |
 | UI text, buttons | Inter | 13–14 px, 400 / 500 | Ink, ink soft |
 | Metadata, labels | Inter | 12–12.5 px, 400 | Ink muted |

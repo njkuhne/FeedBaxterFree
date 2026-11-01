@@ -501,10 +501,12 @@ type ChannelCount struct {
 	Count     int64
 }
 
-// GetFeedbackStats counts feedback received in [from, to) by status,
-// channel and tag. ByStatus always has all four keys.
-func GetFeedbackStats(ctx context.Context, q Querier, d Dialect, tenantID string, from, to *int64) (FeedbackStats, error) {
-	where, args := feedbackWhere(tenantID, FeedbackFilter{From: from, To: to})
+// GetFeedbackStats counts the feedback matching f by status, channel and tag.
+// Stats never filter by status, so f.Statuses is ignored. ByStatus always has
+// all four keys.
+func GetFeedbackStats(ctx context.Context, q Querier, d Dialect, tenantID string, f FeedbackFilter) (FeedbackStats, error) {
+	f.Statuses = nil
+	where, args := feedbackWhere(tenantID, f)
 	st := FeedbackStats{ByStatus: map[string]int64{"new": 0, "reviewed": 0, "actioned": 0, "ignored": 0}}
 
 	rows, err := q.QueryContext(ctx, d.Rebind(

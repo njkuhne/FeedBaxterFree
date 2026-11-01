@@ -30,3 +30,11 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 | npm publishing not set up | M5 | Scope `@feedbaxter`, provenance and a release workflow are still to do. |
 | Swift SDK | M5 | M5 part 2. |
 | Web SDK backlog is not keyed by server `url` | M5 | Items store the ingest key but not the origin, so two clients on one page pointed at different FeedBaxter servers share a backlog and a queued item can be flushed to the other server. One app talks to one server, so this is left as is. |
+
+## UX phase 3
+
+- Auto-advance toggle on the detail page. Phase 1 advances by default after a decision that takes the item out of the list it was opened from, with Undo as the safety net. A switch belongs in the phase 3 shortcuts dialog.
+- Single-key shortcuts have no off switch (WCAG 2.1.4); phase 1 added `z`, `u`, `t` and Shift+`x`. Put the switch in the same shortcuts dialog.
+- The Undo toast lasts 6 s and `z` works only while it is visible. Revisit the duration after real use.
+- Tag and Channel menu counts are totals (from `/api/tags` and the first unfiltered stats load), not counts under the other active filters.
+- Export still has no error path in the UI (phase 3 item 12).

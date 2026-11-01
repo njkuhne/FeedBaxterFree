@@ -1,9 +1,9 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Feedback, Filters } from "../lib/types";
 import { FeedbackList } from "./FeedbackList";
-import { fb, mockApi, renderPage, type Call } from "./testHelpers";
+import { fb, mockApi, renderPage, type Call, type Answer } from "./testHelpers";
 import { clearFeedbackCache } from "./useFeedbackList";
 
 const filters: Filters = { status: "new", tag: "", channel: "", q: "", userId: "" };
@@ -39,6 +39,7 @@ function setup(searchRef?: ReturnType<typeof createRef<HTMLInputElement>>) {
         filters={filters}
         showChannel={false}
         origin="inbox"
+        originLabel="Inbox"
         searchRef={searchRef}
         renderEmpty={() => <p>Nothing here</p>}
       />
@@ -95,7 +96,7 @@ describe("FeedbackList", () => {
     const patch = calls.find((c) => c.method === "PATCH");
     expect(patch?.path).toBe("/api/feedback/fb_3");
     expect(patch?.body).toEqual({ status: "reviewed" });
-    await waitFor(() => expect(screen.getByTestId("announcer").textContent).toBe("Marked 1 as reviewed."));
+    await waitFor(() => expect(screen.getByTestId("announcer").textContent).toBe("Marked 1 as reviewed. Press z to undo."));
     await waitFor(() => expect(document.activeElement).toBe(link("Second")));
   });
 
@@ -112,7 +113,7 @@ describe("FeedbackList", () => {
     await waitFor(() => expect(calls.some((c) => c.path === "/api/feedback/status")).toBe(true));
     const bulk = calls.find((c) => c.path === "/api/feedback/status");
     expect(bulk?.body).toEqual({ ids: ["fb_3", "fb_2"], status: "actioned" });
-    await waitFor(() => expect(screen.getByTestId("announcer").textContent).toBe("Marked 2 as actioned."));
+    await waitFor(() => expect(screen.getByTestId("announcer").textContent).toBe("Marked 2 as actioned. Press z to undo."));
   });
 
   it("ignores shortcuts while the search input has focus", async () => {
@@ -155,5 +156,255 @@ describe("FeedbackList", () => {
     mockApi(() => ({ body: { items: [], nextCursor: null } }));
     setup();
     expect(await screen.findByText("Nothing here")).toBeTruthy();
+  });
+
+  it("shows an undo toast after a single status key and Undo restores the row in place", async () => {
+    const { calls } = api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    fireEvent.keyDown(third, { key: "e" });
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Third" })).toBeNull());
+    expect(screen.getByText("Marked 1 reviewed")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(link("Third")).toBeTruthy());
+    const restore = calls.find((c) => c.path === "/api/feedback/status");
+    expect(restore?.body).toEqual({ ids: ["fb_3"], status: "new" });
+    // Back at the top, where it was, not appended.
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Third", "Second", "First"]);
+    await waitFor(() => expect(document.activeElement).toBe(link("Third")));
+    await screen.findByText("Restored 1 item.");
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+  });
+
+  it("bulk undo sends one status call per original status", async () => {
+    const mixed: Feedback[] = [
+      fb({ id: "fb_3", message: "Third", status: "new", receivedAt: "2026-03-03T09:00:00.000Z" }),
+      fb({ id: "fb_2", message: "Second", status: "reviewed", receivedAt: "2026-03-02T09:00:00.000Z" }),
+      fb({ id: "fb_1", message: "First", status: "new", receivedAt: "2026-03-01T09:00:00.000Z" }),
+    ];
+    const { calls } = mockApi((c) => {
+      if (c.method === "GET" && c.path.startsWith("/api/feedback")) return { body: { items: mixed, nextCursor: null } };
+      if (c.path === "/api/feedback/status") {
+        const ids = (c.body as { ids: string[] }).ids;
+        return { body: { updated: ids.length, notFound: [] } };
+      }
+      return undefined;
+    });
+    renderPage(
+      <FeedbackList
+        filters={{ ...filters, status: "all" }}
+        showChannel={false}
+        origin="inbox"
+        originLabel="Inbox"
+        renderEmpty={() => <p>Nothing here</p>}
+      />,
+    );
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    fireEvent.keyDown(third, { key: "x" });
+    fireEvent.keyDown(third, { key: "j" });
+    await waitFor(() => expect(document.activeElement).toBe(link("Second")));
+    fireEvent.keyDown(link("Second"), { key: "x" });
+    fireEvent.keyDown(link("Second"), { key: "j" });
+    await waitFor(() => expect(document.activeElement).toBe(link("First")));
+    fireEvent.keyDown(link("First"), { key: "x" });
+    fireEvent.keyDown(link("First"), { key: "i" });
+    await screen.findByText("Marked 3 ignored");
+    expect(calls.filter((c) => c.path === "/api/feedback/status")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await screen.findByText("Restored 3 items.");
+    const restores = calls.filter((c) => c.path === "/api/feedback/status").slice(1);
+    expect(restores.map((c) => c.body)).toEqual([
+      { ids: ["fb_3", "fb_1"], status: "new" },
+      { ids: ["fb_2"], status: "reviewed" },
+    ]);
+  });
+
+  it("z undoes the last change", async () => {
+    const { calls } = api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    fireEvent.keyDown(third, { key: "e" });
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Third" })).toBeNull());
+    fireEvent.keyDown(document.body, { key: "z" });
+    await waitFor(() => expect(link("Third")).toBeTruthy());
+    expect(calls.find((c) => c.path === "/api/feedback/status")?.body).toEqual({ ids: ["fb_3"], status: "new" });
+    // Nothing left to undo: a second z does nothing.
+    fireEvent.keyDown(document.body, { key: "z" });
+    expect(calls.filter((c) => c.path === "/api/feedback/status")).toHaveLength(1);
+  });
+
+  it("a key pressed during a request is applied after it", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { calls } = api((c): Answer | undefined =>
+      c.method === "PATCH" && c.path === "/api/feedback/fb_3"
+        ? { body: { ...items[0], status: "reviewed" }, after: gate }
+        : undefined,
+    );
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    fireEvent.keyDown(third, { key: "e" });
+    fireEvent.keyDown(third, { key: "e" });
+    expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(1);
+    release();
+    await waitFor(() => expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(2));
+    // The second press ran against the new current row.
+    expect(calls.filter((c) => c.method === "PATCH").map((c) => c.path)).toEqual(["/api/feedback/fb_3", "/api/feedback/fb_2"]);
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Second" })).toBeNull());
+    expect(screen.queryByRole("link", { name: "Third" })).toBeNull();
+  });
+
+  it("shift-click selects a range", async () => {
+    api();
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    fireEvent.click(screen.getByLabelText("Select: Third"));
+    expect(await screen.findByText("1 selected")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Select: First"), { shiftKey: true });
+    expect(await screen.findByText("3 selected")).toBeTruthy();
+    expect((screen.getByLabelText("Select: Second") as HTMLInputElement).checked).toBe(true);
+    // A plain click toggles just that row.
+    fireEvent.click(screen.getByLabelText("Select: Third"));
+    expect(await screen.findByText("2 selected")).toBeTruthy();
+  });
+
+  it("Shift+x selects a range from the anchor to the current row", async () => {
+    api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    fireEvent.keyDown(third, { key: "x" });
+    fireEvent.keyDown(third, { key: "j" });
+    await waitFor(() => expect(document.activeElement).toBe(link("Second")));
+    fireEvent.keyDown(link("Second"), { key: "j" });
+    await waitFor(() => expect(document.activeElement).toBe(link("First")));
+    fireEvent.keyDown(link("First"), { key: "X", shiftKey: true });
+    expect(await screen.findByText("3 selected")).toBeTruthy();
+  });
+
+  it("select all matching selects up to 500 and bulk actions use them", async () => {
+    const make = (from: number, n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        fb({
+          id: `fb_${String(1000 - from - i).padStart(4, "0")}`,
+          message: `Msg ${from + i}`,
+          receivedAt: new Date(Date.UTC(2026, 2, 1) - (from + i) * 1000).toISOString(),
+        }),
+      );
+    const { calls } = mockApi((c) => {
+      if (c.method === "GET" && c.path.startsWith("/api/feedback")) {
+        const cursor = new URL(c.path, "http://x").searchParams.get("cursor");
+        const start = cursor === null ? 0 : Number(cursor);
+        const n = cursor === null ? 50 : 200;
+        return { body: { items: make(start, n), nextCursor: String(start + n) } };
+      }
+      if (c.path === "/api/feedback/status") {
+        const ids = (c.body as { ids: string[] }).ids;
+        return { body: { updated: ids.length, notFound: [] } };
+      }
+      return undefined;
+    });
+    renderPage(
+      <FeedbackList
+        filters={filters}
+        showChannel={false}
+        origin="inbox"
+        originLabel="Inbox"
+        count={600}
+        renderEmpty={() => <p>Nothing here</p>}
+      />,
+    );
+    await screen.findByRole("link", { name: "Msg 0" });
+    fireEvent.click(screen.getByLabelText("Select all on this page"));
+    expect(await screen.findByText(/All 50 on this page are selected/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Select the first 500 matching" }));
+    await screen.findByText(/The first 500 matching are selected\. Bulk actions handle up to 500 at a time\./);
+    expect(screen.getByText("500 selected")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
+    await waitFor(() => expect(calls.some((c) => c.path === "/api/feedback/status")).toBe(true));
+    const sent = calls.find((c) => c.path === "/api/feedback/status")?.body as { ids: string[]; status: string };
+    expect(sent.status).toBe("reviewed");
+    expect(sent.ids).toHaveLength(500);
+    expect(new Set(sent.ids).size).toBe(500);
+    // The list itself only ever held the first page.
+    expect(calls.filter((c) => c.method === "GET" && c.path.includes("limit=200"))).toHaveLength(3);
+  });
+
+  it("relative times refresh", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    try {
+      vi.setSystemTime(new Date("2026-03-01T10:00:00.000Z"));
+      const recent = [fb({ id: "fb_1", message: "Fresh", receivedAt: "2026-03-01T09:54:30.000Z" })];
+      mockApi(() => ({ body: { items: recent, nextCursor: null } }));
+      setup();
+      await screen.findByRole("link", { name: "Fresh" });
+      const time = () => document.querySelector(".row-time")?.textContent;
+      expect(time()).toBe("5 min ago");
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(time()).toBe("6 min ago");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("t opens the bulk tag editor for the selection", async () => {
+    api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    // Nothing selected: t selects the current row first.
+    fireEvent.keyDown(third, { key: "t" });
+    const input = await screen.findByRole("combobox");
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(input));
+    // Escape in the empty input closes the suggestions, then the popover.
+    fireEvent.keyDown(input, { key: "Escape" });
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("combobox")).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Tag…" }));
+    // The selection survives, and with a selection t opens the popover for all of it.
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Select: Second"));
+    expect(await screen.findByText("2 selected")).toBeTruthy();
+    link("Third").focus();
+    fireEvent.keyDown(link("Third"), { key: "t" });
+    expect(await screen.findByRole("combobox")).toBeTruthy();
+    expect(screen.getByText("2 selected")).toBeTruthy();
+  });
+
+  it("bulk remove tag offers Undo", async () => {
+    const tagged: Feedback[] = [
+      fb({ id: "fb_3", message: "Third", tags: ["bug"], receivedAt: "2026-03-03T09:00:00.000Z" }),
+      fb({ id: "fb_2", message: "Second", tags: ["bug"], receivedAt: "2026-03-02T09:00:00.000Z" }),
+      fb({ id: "fb_1", message: "First", receivedAt: "2026-03-01T09:00:00.000Z" }),
+    ];
+    const { calls } = mockApi((c) => {
+      if (c.method === "GET" && c.path.startsWith("/api/feedback")) return { body: { items: tagged, nextCursor: null } };
+      if (c.path === "/api/feedback/remove-tags" || c.path === "/api/feedback/add-tags") {
+        return { body: { updated: (c.body as { ids: string[] }).ids.length, notFound: [] } };
+      }
+      return undefined;
+    });
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    fireEvent.click(screen.getByLabelText("Select: Third"));
+    fireEvent.click(screen.getByLabelText("Select: Second"));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove tag…" }));
+    fireEvent.click(screen.getByRole("button", { name: "bug (2)" }));
+    await screen.findByText("Removed tag bug from 2");
+    expect(calls.find((c) => c.path === "/api/feedback/remove-tags")?.body).toEqual({ ids: ["fb_3", "fb_2"], tags: ["bug"] });
+    expect(document.querySelectorAll(".pill")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await screen.findByText("Restored tag bug on 2 items.");
+    expect(calls.find((c) => c.path === "/api/feedback/add-tags")?.body).toEqual({ ids: ["fb_3", "fb_2"], tags: ["bug"] });
+    await waitFor(() => expect(screen.getAllByRole("link", { name: "Filter by tag bug" })).toHaveLength(2));
   });
 });

@@ -1,4 +1,4 @@
-import { STATUSES, type Filters, type Status } from "./types";
+import { STATUSES, type Feedback, type Filters, type Status } from "./types";
 
 export const MAX_QUERY = 200;
 
@@ -39,4 +39,18 @@ export function toApiParams(f: Filters): URLSearchParams {
   if (f.q.trim() !== "") params.set("q", f.q.trim().slice(0, MAX_QUERY));
   if (f.userId !== "") params.set("userId", f.userId);
   return params;
+}
+
+/** Whether an item belongs in the list for these filters. Same semantics as the API. */
+export function matchesFilters(item: Feedback, f: Filters): boolean {
+  if (f.status !== "all" && item.status !== f.status) return false;
+  if (f.tag !== "") {
+    const tag = f.tag.toLowerCase();
+    if (!item.tags.some((t) => t.toLowerCase() === tag)) return false;
+  }
+  if (f.channel !== "" && item.channelId !== f.channel) return false;
+  if (f.userId !== "" && item.userId !== f.userId) return false;
+  const q = f.q.trim().toLowerCase();
+  if (q !== "" && !item.message.toLowerCase().includes(q)) return false;
+  return true;
 }

@@ -19,6 +19,7 @@ describe("shortcutFor", () => {
       ["k", "prev"],
       ["ArrowUp", "prev"],
       ["x", "toggleSelect"],
+      ["X", "rangeSelect"],
       ["e", "reviewed"],
       ["a", "actioned"],
       ["i", "ignored"],
@@ -29,6 +30,14 @@ describe("shortcutFor", () => {
       ["?", "toggleHelp"],
     ];
     for (const [k, action] of table) expect(shortcutFor(key(k), open)).toBe(action);
+  });
+
+  it("maps z to undo and u to back", () => {
+    expect(shortcutFor(key("z"), open)).toBe("undo");
+    expect(shortcutFor(key("u"), open)).toBe("back");
+    expect(shortcutFor(key("z", { target: { tagName: "INPUT", type: "text" } }), open)).toBeNull();
+    expect(shortcutFor(key("z", { metaKey: true }), open)).toBeNull();
+    expect(shortcutFor(key("z"), { dialogOpen: true })).toBeNull();
   });
 
   it("returns null for other keys", () => {
@@ -64,5 +73,10 @@ describe("shortcutFor", () => {
   it("leaves Enter to links and buttons", () => {
     expect(shortcutFor(key("Enter", { target: { tagName: "A" } }), open)).toBeNull();
     expect(shortcutFor(key("Enter", { target: { tagName: "BUTTON" } }), open)).toBeNull();
+  });
+
+  it("maps t to tag", () => {
+    expect(shortcutFor(key("t"), open)).toBe("tag");
+    expect(shortcutFor(key("t", { target: { tagName: "INPUT", type: "text" } }), open)).toBeNull();
   });
 });

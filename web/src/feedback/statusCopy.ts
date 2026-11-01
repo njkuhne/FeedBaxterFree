@@ -4,8 +4,8 @@ import type { Status } from "../lib/types";
 export const ACTION_LABEL: Record<Status, string> = {
   reviewed: "Mark reviewed",
   actioned: "Mark actioned",
-  ignored: "Ignore",
-  new: "Mark as new",
+  ignored: "Mark ignored",
+  new: "Mark new",
 };
 
 /** The order the actions are listed in. */
@@ -16,6 +16,16 @@ export function markedSentence(updated: number, status: Status, notFound = 0): s
   const base = `Marked ${updated} as ${status}.`;
   if (notFound <= 0) return base;
   return `${base} ${notFound} ${notFound === 1 ? "was" : "were"} no longer there.`;
+}
+
+/** Toast text after a status change: "Marked 3 reviewed". */
+export function markedToast(count: number, status: Status): string {
+  return `Marked ${count} ${status}`;
+}
+
+/** Appended to the screen reader announcement of a status change. */
+export function withUndoHint(sentence: string): string {
+  return `${sentence} Press z to undo.`;
 }
 
 /** Detail page: "Marked as reviewed." */

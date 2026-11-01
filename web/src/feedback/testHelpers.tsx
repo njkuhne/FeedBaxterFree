@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import { AnnouncerProvider } from "../components/Announcer";
 import { ToastProvider } from "../components/Toast";
 import type { Feedback } from "../lib/types";
+import { UndoProvider } from "./undo";
 
 export function fb(over: Partial<Feedback> & { id: string }): Feedback {
   return {
@@ -30,7 +31,14 @@ export interface Call {
   body: unknown;
 }
 
-export type Handler = (call: Call) => { status?: number; body?: unknown } | undefined;
+export interface Answer {
+  status?: number;
+  body?: unknown;
+  /** The response is held back until this promise resolves, to test requests in flight. */
+  after?: Promise<unknown>;
+}
+
+export type Handler = (call: Call) => Answer | undefined;
 
 /** Stubs fetch. The handler answers by method and path; anything it does not answer is 404. */
 export function mockApi(handler: Handler): { calls: Call[] } {
@@ -43,10 +51,11 @@ export function mockApi(handler: Handler): { calls: Call[] } {
       calls.push(call);
       const answer = handler(call) ?? { status: 404, body: { error: "not_found", message: "Not found." } };
       const status = answer.status ?? 200;
-      if (status === 204) return Promise.resolve(new Response(null, { status }));
-      return Promise.resolve(
-        new Response(JSON.stringify(answer.body ?? {}), { status, headers: { "Content-Type": "application/json" } }),
-      );
+      const response =
+        status === 204
+          ? new Response(null, { status })
+          : new Response(JSON.stringify(answer.body ?? {}), { status, headers: { "Content-Type": "application/json" } });
+      return answer.after ? answer.after.then(() => response) : Promise.resolve(response);
     }),
   );
   return { calls };
@@ -57,9 +66,44 @@ export function renderPage(ui: ReactElement, opts: { at?: string; route?: string
     <ToastProvider>
       <AnnouncerProvider>
         <MemoryRouter initialEntries={[opts.at ?? "/"]}>
-          <Routes>
-            <Route path={opts.route ?? "*"} element={ui} />
-          </Routes>
+          <UndoProvider>
+            <Routes>
+              <Route path={opts.route ?? "*"} element={ui} />
+            </Routes>
+          </UndoProvider>
+        </MemoryRouter>
+      </AnnouncerProvider>
+    </ToastProvider>,
+  );
+}
+
+export interface HistoryEntry {
+  /** May carry a query string: "/?status=reviewed". */
+  pathname: string;
+  state?: unknown;
+}
+
+/** Renders real routes with a history stack; the last entry is the current page. */
+export function renderRoutes(entries: HistoryEntry[], routes: { path: string; element: ReactElement }[]) {
+  const initial = entries.map((e) => {
+    const q = e.pathname.indexOf("?");
+    return {
+      pathname: q < 0 ? e.pathname : e.pathname.slice(0, q),
+      search: q < 0 ? "" : e.pathname.slice(q),
+      state: e.state,
+    };
+  });
+  return render(
+    <ToastProvider>
+      <AnnouncerProvider>
+        <MemoryRouter initialEntries={initial} initialIndex={initial.length - 1}>
+          <UndoProvider>
+            <Routes>
+              {routes.map((r) => (
+                <Route key={r.path} path={r.path} element={r.element} />
+              ))}
+            </Routes>
+          </UndoProvider>
         </MemoryRouter>
       </AnnouncerProvider>
     </ToastProvider>,

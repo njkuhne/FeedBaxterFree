@@ -425,6 +425,80 @@ func TestListFilters(t *testing.T) {
 	})
 }
 
+func TestStatsFilterParams(t *testing.T) {
+	eachDialect(t, func(t *testing.T, e *env) {
+		ctx := context.Background()
+		ids := e.seed("alpha Safari crash", "beta slow", "gamma safari", "delta")
+		p := e.principal(e.admin)
+		if _, err := e.svc.SetStatus(ctx, p, []string{ids[1]}, "reviewed"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.svc.AddTags(ctx, p, []string{ids[0], ids[2]}, []string{"Bug"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := e.svc.AddTags(ctx, p, []string{ids[0]}, []string{"UI"}); err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range ids[:2] {
+			if _, err := e.db.SQL.ExecContext(ctx, e.db.Dialect.Rebind("UPDATE feedback SET user_id = ? WHERE id = ?"), "u1", id); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		stats := func(query string) map[string]any {
+			return e.want(e.asAdmin("GET", "/api/stats"+query, nil), 200).obj(t)
+		}
+		unfiltered := stats("")
+		if unfiltered["total"] != float64(4) {
+			t.Fatalf("unfiltered = %v", unfiltered)
+		}
+
+		st := stats("?tag=bug&channel=" + e.channel.ID + "&userId=u1&q=safari")
+		bs := st["byStatus"].(map[string]any)
+		if st["total"] != float64(1) || bs["new"] != float64(1) || bs["reviewed"] != float64(0) {
+			t.Fatalf("combined = %v", st)
+		}
+		if bc := st["byChannel"].([]any); len(bc) != 1 || bc[0].(map[string]any)["channelId"] != e.channel.ID {
+			t.Fatalf("combined byChannel = %v", bc)
+		}
+		if bt := st["byTag"].([]any); len(bt) != 2 {
+			t.Fatalf("combined byTag = %v", bt)
+		}
+		if st = stats("?tag=bug"); st["total"] != float64(2) {
+			t.Fatalf("tag = %v", st)
+		}
+		if st = stats("?userId=u1"); st["total"] != float64(2) {
+			t.Fatalf("userId = %v", st)
+		}
+		if st = stats("?q=safari"); st["total"] != float64(2) {
+			t.Fatalf("q = %v", st)
+		}
+		st = stats("?tag=nope")
+		if st["total"] != float64(0) || fmt.Sprint(st["byChannel"]) != "[]" || fmt.Sprint(st["byTag"]) != "[]" {
+			t.Fatalf("empty = %v", st)
+		}
+		if _, ok := st["byChannel"].([]any); !ok {
+			t.Fatalf("byChannel not an array: %v", st["byChannel"])
+		}
+		if _, ok := st["byTag"].([]any); !ok {
+			t.Fatalf("byTag not an array: %v", st["byTag"])
+		}
+		if len(st) != 4 {
+			t.Fatalf("shape = %v", st)
+		}
+
+		e.wantErr(e.asAdmin("GET", "/api/stats?q="+strings.Repeat("x", 201), nil), 400, "invalid_request")
+		e.wantErr(e.asAdmin("GET", "/api/stats?from=2026-03-05T00:00:00Z&to=2026-03-01T00:00:00Z", nil), 400, "invalid_request")
+		ignored := stats("?status=bogus")
+		if fmt.Sprint(ignored) != fmt.Sprint(unfiltered) {
+			t.Fatalf("status=bogus = %v, want %v", ignored, unfiltered)
+		}
+		if st = stats("?status=reviewed"); st["total"] != float64(4) {
+			t.Fatalf("status applied: %v", st)
+		}
+	})
+}
+
 func TestExportCSVQuoting(t *testing.T) {
 	eachDialect(t, func(t *testing.T, e *env) {
 		ctx := context.Background()

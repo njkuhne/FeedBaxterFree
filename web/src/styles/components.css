@@ -316,7 +316,7 @@
 }
 
 .chip-ignored {
-  border: 1px dashed var(--kraft);
+  border: 1px dashed var(--bark);
   color: var(--ink-muted);
 }
 
@@ -333,7 +333,7 @@
 }
 
 .pill-removable {
-  height: 28px;
+  height: 32px;
   padding-right: 0;
 }
 
@@ -342,8 +342,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   background: none;
@@ -364,6 +364,16 @@
 
 .pill-remove:hover {
   color: var(--ink);
+}
+
+/* A pill that filters the list by its tag */
+.pill-link {
+  text-decoration: none;
+}
+
+.pill-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }
 
 /* Toasts */
@@ -431,6 +441,33 @@
   top: 50%;
   left: 50%;
   width: var(--target);
+  height: var(--target);
+  translate: -50% -50%;
+}
+
+.toast-action {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-decoration-color: var(--paper);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.toast-action::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--target));
   height: var(--target);
   translate: -50% -50%;
 }

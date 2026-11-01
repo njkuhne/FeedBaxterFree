@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bytes, duration, plural } from "./format";
+import { bytes, duration, platformName, plural } from "./format";
 
 describe("format", () => {
   it("formats bytes in binary units with one decimal", () => {
@@ -24,5 +24,15 @@ describe("format", () => {
     expect(plural(1, "item", "items")).toBe("1 item");
     expect(plural(0, "item", "items")).toBe("0 items");
     expect(plural(12, "item", "items")).toBe("12 items");
+  });
+
+  it("platformName maps known platforms and keeps unknown ones", () => {
+    expect(platformName("ios")).toBe("iOS");
+    expect(platformName("macos")).toBe("macOS");
+    expect(platformName("ipados")).toBe("iPadOS");
+    expect(platformName("web")).toBe("Web");
+    expect(platformName("android")).toBe("Android");
+    expect(platformName("IOS")).toBe("iOS");
+    expect(platformName("Watch OS")).toBe("Watch OS");
   });
 });

@@ -217,16 +217,12 @@ func (a *api) listTags(w http.ResponseWriter, r *http.Request, p ext.Principal) 
 }
 
 func (a *api) stats(w http.ResponseWriter, r *http.Request, p ext.Principal) error {
-	q := r.URL.Query()
-	from, err := parseTime(q.Get("from"), "from")
+	f, err := filterFrom(r)
 	if err != nil {
 		return err
 	}
-	to, err := parseTime(q.Get("to"), "to")
-	if err != nil {
-		return err
-	}
-	st, err := a.svc.Stats(r.Context(), p, from, to)
+	f.Statuses = nil // stats count per status; a status parameter is ignored
+	st, err := a.svc.Stats(r.Context(), p, f)
 	if err != nil {
 		return err
 	}

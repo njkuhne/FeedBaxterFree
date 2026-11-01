@@ -2,21 +2,24 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { errorMessage } from "../lib/api";
 import { cursorReducer, type CursorAction, type CursorState } from "../lib/cursorList";
 import { listFeedback } from "../lib/endpoints";
-import { toApiParams } from "../lib/filters";
 import type { Feedback, Filters } from "../lib/types";
+import {
+  applyToList,
+  clearFeedbackCache,
+  dropList,
+  getFocus,
+  getList,
+  listKey,
+  setFocus,
+  setList,
+  subscribe,
+} from "./listStore";
+
+export { clearFeedbackCache };
 
 interface Cached {
   items: Feedback[];
   nextCursor: string | null;
-}
-
-// In-memory only: lists and the focused row per query, so Back from a detail page restores them.
-const listCache = new Map<string, Cached>();
-const focusCache = new Map<string, string>();
-
-export function clearFeedbackCache(): void {
-  listCache.clear();
-  focusCache.clear();
 }
 
 type ListState = CursorState<Feedback> & { key: string };
@@ -25,6 +28,8 @@ type ListAction =
   | CursorAction<Feedback>
   | { type: "begin"; key: string; requestId: number; seed: Cached | null }
   | { type: "more"; requestId: number }
+  | { type: "apply"; items: Feedback[]; filters: Filters }
+  | { type: "cache"; items: Feedback[]; nextCursor: string | null }
   | { type: "refreshed"; requestId: number; items: Feedback[]; nextCursor: string | null };
 
 function isAfter(a: Feedback, b: Feedback): boolean {
@@ -42,6 +47,10 @@ function listReducer(state: ListState, action: ListAction): ListState {
         error: null,
         requestId: action.requestId,
       };
+    case "apply":
+      return { ...state, ...applyToList(state, action.filters, action.items) };
+    case "cache":
+      return { ...state, items: action.items, nextCursor: action.nextCursor, loading: false };
     case "more":
       return { ...state, loading: true, error: null, requestId: action.requestId };
     case "refreshed": {
@@ -68,7 +77,7 @@ function listReducer(state: ListState, action: ListAction): ListState {
 }
 
 function init(key: string): ListState {
-  const cached = listCache.get(key);
+  const cached = getList(key);
   return {
     key,
     items: cached?.items ?? [],
@@ -79,8 +88,27 @@ function init(key: string): ListState {
   };
 }
 
+/** True once `active` has stayed true for `ms`; false at once when it goes false. */
+export function useDelayedFlag(active: boolean, ms: number): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setOn(false);
+      return;
+    }
+    const t = setTimeout(() => setOn(true), ms);
+    return () => clearTimeout(t);
+  }, [active, ms]);
+  return active && on;
+}
+
 export interface FeedbackListApi {
+  /** The rows to show: this query's, or while it loads with nothing cached, the previous query's (see `stale`). */
   items: Feedback[];
+  /** True while `items` belong to the previous query and the new one is still loading. */
+  stale: boolean;
+  /** The previous query's filters when `stale`, so the caller can tell a search from another change. */
+  staleFilters: Filters | null;
   nextCursor: string | null;
   loading: boolean;
   error: string | null;
@@ -95,9 +123,13 @@ export interface FeedbackListApi {
 
 /** Fetches a feedback list by cursor, with an in-memory cache keyed by the query. */
 export function useFeedbackList(filters: Filters): FeedbackListApi {
-  const key = toApiParams(filters).toString();
+  const key = listKey(filters);
   const [state, dispatch] = useReducer(listReducer, key, init);
-  const restoredFocusId = useRef<string | null>(focusCache.get(key) ?? null);
+  // The focused row remembered for this query. Recomputed when the query changes, since the list
+  // component no longer remounts per query.
+  const restored = useRef<{ key: string; id: string | null }>({ key, id: getFocus(key) });
+  if (restored.current.key !== key) restored.current = { key, id: getFocus(key) };
+  const shown = useRef<{ key: string; filters: Filters; items: Feedback[] } | null>(null);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
   const stateRef = useRef(state);
@@ -107,7 +139,7 @@ export function useFeedbackList(filters: Filters): FeedbackListApi {
 
   useEffect(() => {
     const rid = ++requestId.current;
-    const cached = listCache.get(key) ?? null;
+    const cached = getList(key) ?? null;
     dispatch({ type: "begin", key, requestId: rid, seed: cached });
     listFeedback(filtersRef.current)
       .then((page) => {
@@ -122,13 +154,27 @@ export function useFeedbackList(filters: Filters): FeedbackListApi {
 
   useEffect(() => {
     if (state.key === key && (state.items.length > 0 || !state.loading)) {
-      listCache.set(key, { items: state.items, nextCursor: state.nextCursor });
+      setList(key, { filters: filtersRef.current, items: state.items, nextCursor: state.nextCursor });
     }
   }, [state.items, state.nextCursor, state.loading, state.key, key]);
 
+  // Changes made anywhere (the list, the detail page, Undo) arrive through the store.
+  useEffect(
+    () =>
+      subscribe((e) => {
+        if (e.type === "apply") dispatch({ type: "apply", items: e.items, filters: filtersRef.current });
+        else if (e.type === "remove") dispatch({ type: "remove", ids: e.ids });
+        else if (e.key === key) {
+          const c = getList(key);
+          if (c) dispatch({ type: "cache", items: c.items, nextCursor: c.nextCursor });
+        }
+      }),
+    [key],
+  );
+
   const loadMore = useCallback(() => {
     const s = stateRef.current;
-    if (s.loading || s.nextCursor === null) return;
+    if (s.key !== listKey(filtersRef.current) || s.loading || s.nextCursor === null) return;
     const rid = ++requestId.current;
     dispatch({ type: "more", requestId: rid });
     listFeedback(filtersRef.current, s.nextCursor)
@@ -137,7 +183,7 @@ export function useFeedbackList(filters: Filters): FeedbackListApi {
   }, []);
 
   const reload = useCallback(() => {
-    listCache.delete(key);
+    dropList(key);
     setTick((t) => t + 1);
   }, [key]);
 
@@ -145,18 +191,23 @@ export function useFeedbackList(filters: Filters): FeedbackListApi {
   const replace = useCallback((item: Feedback) => dispatch({ type: "replace", item }), []);
   const setFocused = useCallback(
     (id: string) => {
-      focusCache.set(key, id);
+      setFocus(key, id);
     },
     [key],
   );
 
   const ready = state.key === key;
+  const own = ready && (state.items.length > 0 || !state.loading);
+  if (own) shown.current = { key, filters: filtersRef.current, items: state.items };
+  const keep = !own && shown.current !== null && shown.current.items.length > 0 ? shown.current : null;
   return {
-    items: ready ? state.items : [],
+    items: own ? state.items : keep !== null ? keep.items : [],
+    stale: keep !== null,
+    staleFilters: keep !== null ? keep.filters : null,
     nextCursor: ready ? state.nextCursor : null,
     loading: ready ? state.loading : true,
     error: ready ? state.error : null,
-    restoredFocusId: restoredFocusId.current,
+    restoredFocusId: restored.current.id,
     loadMore,
     reload,
     remove,

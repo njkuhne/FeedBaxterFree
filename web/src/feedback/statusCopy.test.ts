@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addedTagSentence, markedOneSentence, markedSentence, validTag } from "./statusCopy";
+import { ACTION_LABEL, addedTagSentence, markedOneSentence, markedSentence, markedToast, validTag, withUndoHint } from "./statusCopy";
 
 describe("statusCopy", () => {
   it("announces singular and plural counts", () => {
@@ -16,6 +16,14 @@ describe("statusCopy", () => {
   it("has the detail and tag sentences", () => {
     expect(markedOneSentence("reviewed")).toBe("Marked as reviewed.");
     expect(addedTagSentence("bug", 3)).toBe("Added tag bug to 3.");
+  });
+
+  it("has the action labels, the toast text and the undo hint", () => {
+    expect(ACTION_LABEL.ignored).toBe("Mark ignored");
+    expect(ACTION_LABEL.new).toBe("Mark new");
+    expect(markedToast(3, "reviewed")).toBe("Marked 3 reviewed");
+    expect(markedToast(1, "reviewed")).toBe("Marked 1 reviewed");
+    expect(withUndoHint(markedSentence(3, "reviewed"))).toBe("Marked 3 as reviewed. Press z to undo.");
   });
 
   it("validates tag length", () => {
