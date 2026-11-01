@@ -1,0 +1,14 @@
+.DS_Store
+/bin/
+/dist/
+/data/
+*.db
+*.db-wal
+*.db-shm
+/web/node_modules/
+/web/dist/
+/sdk/web/node_modules/
+/sdk/web/dist/
+.env
+.env.*
+!.env.example

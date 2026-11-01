@@ -1,0 +1,54 @@
+Unable to find image 'golang:alpine' locally
+alpine: Pulling from library/golang
+4f4fb700ef54: Pulling fs layer
+fcdc05aad5cf: Pulling fs layer
+d3531b7a4f21: Pulling fs layer
+e2e7dba5c307: Pulling fs layer
+070112d39252: Pulling fs layer
+070112d39252: Download complete
+4f4fb700ef54: Already exists
+fcdc05aad5cf: Download complete
+d3531b7a4f21: Download complete
+8ea6f5cff28d: Download complete
+d3531b7a4f21: Pull complete
+36a935616aa1: Download complete
+fcdc05aad5cf: Pull complete
+e2e7dba5c307: Download complete
+070112d39252: Pull complete
+4f4fb700ef54: Pull complete
+e2e7dba5c307: Pull complete
+Digest: sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+Status: Downloaded newer image for golang:alpine
+== go version ==
+go version go1.27.3 linux/arm64
+== resolving modules ==
+go: added golang.org/x/time v0.16.0
+go: added modernc.org/libc v1.79.0
+go: added modernc.org/mathutil v1.7.1
+go: added modernc.org/memory v1.12.1
+go: added modernc.org/sqlite v1.61.1
+== pinned versions ==
+	github.com/nats-io/nats-server/v2 v2.15.2
+	github.com/nats-io/nats.go v1.55.0
+	modernc.org/sqlite v1.61.1
+	github.com/nats-io/jwt/v2 v2.8.2 // indirect
+	github.com/nats-io/nkeys v0.4.16 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
+== build (CGO_ENABLED=0, -s -w, -trimpath) ==
+full probe (nats-server+jetstream+nats.go+modernc sqlite): 19.5 MB
+== size breakdown builds ==
+nats-server only: 5.3 MB
+modernc sqlite only: 5.9 MB
+== run ==
+RSS at start: 14592 kB
+RSS idle with embedded JetStream + SQLite open: 26892 kB
+publish 50000 msgs: 116.453166ms (429357 msg/s)
+process 50000 msgs into SQLite (batch 500, one tx per batch): 233.952042ms (213719 msg/s)
+rows in sqlite: 50000
+RSS after load: 88360 kB
+== latest MCP go-sdk / pgx versions ==
+v1.8.0-pre.1
+v1.8.0-pre.2
+v1.8.0
+v5.11.0
+v5.12.0
