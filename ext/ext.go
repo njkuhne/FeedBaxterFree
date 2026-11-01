@@ -75,8 +75,7 @@ type Limits struct {
 	Monthly int64
 }
 
-// Deps is what extensions receive. M0 holds only what exists; M1 adds the NATS
-// connection and the KV key writer, M2 may add more. Exported types only.
+// Deps is what extensions receive. M2 may add more. Exported types only.
 type Deps struct {
 	// DB is the database handle.
 	DB *sql.DB
@@ -84,6 +83,9 @@ type Deps struct {
 	Dialect string
 	// Logger is the process logger.
 	Logger *slog.Logger
+	// Keys rewrites ingest key cache entries after key, channel, tenant or limit
+	// changes. Nil in the ingest and worker modes, which do not write the cache.
+	Keys KeyWriter
 }
 
 // Migration is an extension migration, applied after core migrations in its own
@@ -96,4 +98,13 @@ type Migration struct {
 	SQLite string
 	// Postgres is the SQL body for Postgres.
 	Postgres string
+}
+
+// KeyWriter rewrites ingest key cache entries from the database. The api mode calls it after every
+// key, channel, tenant or limit change; a periodic reconcile repairs anything missed.
+type KeyWriter interface {
+	// SyncKey upserts the entry of one key (revoked keys included).
+	SyncKey(ctx context.Context, keyID string) error
+	// SyncTenant upserts the tenant's keys and deletes its orphaned entries.
+	SyncTenant(ctx context.Context, tenantID string) error
 }

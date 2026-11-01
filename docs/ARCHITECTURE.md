@@ -144,8 +144,8 @@ The "very next request" rejection guarantee is per replica; cross-replica oversh
 
 | Object | Name | Config |
 | --- | --- | --- |
-| Stream | `FEEDBACK` | subjects `feedback.ingest`; `MaxMsgs` = `QUEUE_MAX_MSGS` (default 100000), `MaxBytes` = `QUEUE_MAX_BYTES` (default 256 MiB); `Discard: New`; file storage; `Duplicates` window 2 min |
-| Consumer | `processor` | durable, pull, `AckExplicit`, `MaxDeliver` = `QUEUE_MAX_DELIVER` (default 5), `AckWait` 30 s, `MaxAckPending` 2000 |
+| Stream | `FEEDBACK` | subjects `feedback.ingest`; `MaxMsgs` = `QUEUE_MAX_MSGS` (default 100000), `MaxBytes` = `QUEUE_MAX_BYTES` (default 256 MiB); `Discard: New`; `Retention: WorkQueue` (an acked message leaves the stream; with the default limits policy acked messages would fill a DiscardNew stream and ingest would 503 forever); file storage; `Duplicates` window 2 min |
+| Consumer | `processor` | durable, pull, `AckExplicit`, `MaxDeliver` unlimited (-1) so JetStream never strands a message; `AckWait` 30 s, `MaxAckPending` 2000. `QUEUE_MAX_DELIVER` is applied by the processor, not the consumer (§7) |
 | Stream | `FEEDBACK_DLQ` | subject `feedback.dlq`; `MaxMsgs` 10000; `Discard: Old` (DLQ may roll, main queue never does) |
 | KV | `keys` | history 1 |
 | KV | `counters` | history 1, per-key TTL enabled |
@@ -159,7 +159,10 @@ Loop per worker goroutine (`WORKER_CONCURRENCY`, default 1 for SQLite, 4 for Pos
 1. `cons.Fetch(BatchSize, FetchMaxWait)` (defaults 500, 250 ms).
 2. For each message: parse headers and body; normalise (`strings.TrimSpace` message, clamp lengths, `platform` lower-cased, `metadata` re-encoded compact). Unparseable → publish to `feedback.dlq` with the original headers plus `FB-Error`, then `Term`.
 3. One transaction: `INSERT INTO feedback … ON CONFLICT (tenant_id, idempotency_key) DO NOTHING` per row via a prepared statement (multi-row VALUES on Postgres). Commit.
-4. Ack every message in the batch. On transaction error: if `NumDelivered >= MaxDeliver` for a message, DLQ + ack it; otherwise `Nak` with a delay (`NakWithDelay`, 1 s × attempt).
+4. Ack every message in the batch. On error, two failure classes:
+   - **Transient** (database unreachable: begin or commit failure, `sql.ErrConnDone`, `driver.ErrBadConn`, context errors, any `net.Error`, or any insert error while a ping also fails): never dead-letter. `NakWithDelay(min(1 s × NumDelivered, 30 s))` and pause fetching for that long. Retries are unbounded; the consumer has no `MaxDeliver`.
+   - **Rejected row** (database reachable, the row itself fails): retry each row of the batch in its own transaction so one poison row does not drag the batch down; a row with `NumDelivered >= QUEUE_MAX_DELIVER` is dead-lettered and acked, otherwise `Nak` with the same backoff but without pausing the worker.
+   - A failed DLQ publish is infrastructure trouble: `Nak` with backoff and pause; never ack or term.
 
 Retention: a jittered ticker (`RETENTION_CHECK_INTERVAL`, default `1h`) in every worker deletes rows older than `RETENTION_WINDOW` (default `17520h`, 2 years) in batches of 1000 per transaction until none remain.
 
@@ -209,7 +212,8 @@ All from env (a `.env` file is read if present, env wins). Durations are Go dura
 | `DAILY_LIMIT` / `MONTHLY_LIMIT` | `0` (unlimited) | self-host `LimitsSource` |
 | `RATE_LIMIT_PER_KEY` / `RATE_LIMIT_WINDOW` | `60` / `10s` | ingest |
 | `MAX_BODY_BYTES` / `MAX_MESSAGE_CHARS` / `MAX_METADATA_BYTES` | `16384` / `5000` / `4096` | ingest, worker |
-| `QUEUE_MAX_MSGS` / `QUEUE_MAX_BYTES` / `QUEUE_MAX_DELIVER` | `100000` / `268435456` / `5` | queue |
+| `QUEUE_MAX_MSGS` / `QUEUE_MAX_BYTES` | `100000` / `268435456` | queue |
+| `QUEUE_MAX_DELIVER` | `5` | worker: attempts at inserting a row the database rejects before it is dead-lettered; outages retry forever |
 | `WORKER_CONCURRENCY` / `WORKER_BATCH_SIZE` / `WORKER_FETCH_MAX_WAIT` | `1` (SQLite) or `4` / `500` / `250ms` | worker |
 | `PUBLISH_TIMEOUT` | `2s` | ingest |
 | `LOG_LEVEL` / `LOG_FORMAT` | `info` / `text` (`json` for SaaS) | all |

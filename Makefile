@@ -9,15 +9,16 @@ GO         ?= $(DOCKER_RUN) go
 LDFLAGS     = -s -w -X github.com/njkuhne/feedbaxter.Version=$(VERSION)
 # 32 MiB.
 SIZE_LIMIT ?= 33554432
+DEV_PORT   ?= 8090
 PG_URL_DEV  = postgres://feedbaxter:feedbaxter@postgres:5432/feedbaxter_test?sslmode=disable
 COMPOSE_DEV = docker compose -f deploy/compose.dev.yml
 
 HOST_GOOS   = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 HOST_GOARCH = $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 
-# The `ui` target arrives in M3 (web/ does not exist yet) and `dev` in M1 (no pipeline to run yet).
+# The `ui` target arrives in M3 (web/ does not exist yet).
 
-.PHONY: help build test test-pg vet lint image size-check clean
+.PHONY: help build dev test test-pg vet lint image size-check clean
 
 .DEFAULT_GOAL := help
 
@@ -28,6 +29,11 @@ build: ## Build bin/feedbaxter (host) and linux amd64/arm64 binaries
 	GOOS=linux GOARCH=amd64 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/feedbaxter-linux-amd64 ./cmd/feedbaxter
 	GOOS=linux GOARCH=arm64 $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/feedbaxter-linux-arm64 ./cmd/feedbaxter
 	GOOS=$(HOST_GOOS) GOARCH=$(HOST_GOARCH) $(GO) build -trimpath -ldflags "$(LDFLAGS)" -o bin/feedbaxter ./cmd/feedbaxter
+
+dev: DOCKER_EXTRA = --init -p $(DEV_PORT):8080 -e DATA_DIR=/src/data -e HTTP_ADDR=:8080
+dev: ## Run serve (all mode, SQLite in ./data) on localhost:DEV_PORT (default 8090; 8080 is taken on this machine)
+	mkdir -p data
+	$(DOCKER_RUN) sh -c 'go build -o /tmp/feedbaxter ./cmd/feedbaxter && exec /tmp/feedbaxter serve'
 
 test: ## Run the test suite (SQLite)
 	$(GO) test -count=1 ./...
