@@ -6,3 +6,6 @@ assets
 **/node_modules
 .env
 .env.*
+web/dist
+web/node_modules
+data-*

@@ -468,3 +468,37 @@ func TestRunAllAdminRoundTrip(t *testing.T) {
 		t.Fatalf("Run = %v, want nil", err)
 	}
 }
+
+// TestRunAllServesUI checks the admin UI is mounted at / without shadowing the API.
+// The embedded dist is the real build when present, else only .gitkeep (503).
+func TestRunAllServesUI(t *testing.T) {
+	isolateAll(t)
+	r := startRun(t, Options{Mode: "all"})
+	r.waitReady(t)
+
+	resp, err := http.Get(r.url("/"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("GET / = %d, want 200 or 503", resp.StatusCode)
+	}
+	if !strings.Contains(resp.Header.Get("Content-Security-Policy"), "default-src 'self'") {
+		t.Fatalf("GET / has no CSP: %v", resp.Header)
+	}
+	if resp.StatusCode == http.StatusOK && !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		t.Fatalf("GET / Content-Type = %q", resp.Header.Get("Content-Type"))
+	}
+
+	resp, err = http.Get(r.url("/api/me"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var body map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	if resp.StatusCode != http.StatusUnauthorized || body["error"] != "unauthenticated" {
+		t.Fatalf("GET /api/me = %d %v, want 401 unauthenticated", resp.StatusCode, body)
+	}
+}

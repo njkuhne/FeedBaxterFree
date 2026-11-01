@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,6 +23,8 @@ import (
 	"github.com/njkuhne/feedbaxter/internal/selfhost"
 	"github.com/njkuhne/feedbaxter/internal/service"
 	"github.com/njkuhne/feedbaxter/internal/store"
+	"github.com/njkuhne/feedbaxter/internal/ui"
+	"github.com/njkuhne/feedbaxter/web"
 )
 
 // Version is the build version, set by -ldflags "-X github.com/njkuhne/feedbaxter.Version=<v>".
@@ -176,6 +179,11 @@ func Run(ctx context.Context, opts Options) (err error) {
 	}
 	if cfg.Mode == "api" || cfg.Mode == "all" {
 		mux.Handle("/api/", apiHandler)
+		// The admin UI answers everything else; more specific patterns (/healthz,
+		// /readyz, /api/, /v1/feedback, extension routes) still win.
+		if sub, err := fs.Sub(web.Dist, "dist"); err == nil {
+			mux.Handle("/", ui.Handler(sub))
+		}
 		if opts.MountRoutes != nil {
 			opts.MountRoutes(mux, deps)
 		}

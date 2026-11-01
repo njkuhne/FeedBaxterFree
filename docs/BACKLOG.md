@@ -15,3 +15,6 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 | Per-tenant in-flight cap on the queue | M1 | The stream cap is global; the daily cap and rate limit are the fuse. Revisit for SaaS. |
 | New tenants' counters start at 0 until the first flush | M1 | Within the documented overshoot bound; `KeyWriter.SyncTenant` scans every KV key, fine for self-host, needs an index at SaaS scale. |
 | SaaS Authenticator needs password helpers | M2 | `ext` exposes no password hashing; the private repo must use argon2id with the same PHC format, or `ext` grows a `PasswordHasher` in M6. |
+| "Monthly limit reached" state in the UI | M3 | The empty state exists in the design but no API endpoint exposes the tenant's limits or whether it is capped. Add a limits field to `/api/me` or `/api/ops` with the SaaS work in M6 and wire the state then. |
+| Compose build reports `version=dev` | M3 | `deploy/docker-compose.yml` passes no `VERSION` build argument. Pass it from the release workflow once releases exist. |
+| Metadata separators read aloud | M3 | The inbox row's "·" separators are plain text; a screen reader reads them. Mark them `aria-hidden` in a polish pass. |

@@ -2,11 +2,13 @@
 /bin/
 /dist/
 /data/
+/data-*/
 *.db
 *.db-wal
 *.db-shm
 /web/node_modules/
-/web/dist/
+/web/dist/*
+!/web/dist/.gitkeep
 /sdk/web/node_modules/
 /sdk/web/dist/
 .env

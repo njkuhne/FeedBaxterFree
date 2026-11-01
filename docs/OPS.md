@@ -81,6 +81,10 @@ On first start the log shows two lines, once each:
 
 The admin email is `ADMIN_EMAIL`. The first login forces a password change. Only hashes are stored, so neither value can be retrieved later: copy them from the first-boot log (`docker compose logs feedbaxter`). If the log is lost, use `reset-admin` below for the password; for the key, create a new one in the admin UI (or `POST /api/channels/{id}/keys`) and revoke the old one. The first-boot key is an ordinary key and can be revoked the same way (`POST /api/keys/{id}/revoke`).
 
+In the UI: sign in at `/` with the temporary password, set a new one when asked, and the inbox shows a "Send your first feedback" page with a ready curl command. If the key line is lost, use "Create a key" on that page or "Create key" under Channels and keys.
+
+The UI is served by the same binary at `/`. It makes no external requests (fonts are bundled). Hashed files under `/assets/` are cached for a year and `index.html` is never cached, so an upgrade takes effect on the next page load.
+
 Ingest keys are managed by admins through the API and UI: create a key per channel, revoke it when it leaks or an app is retired. Revocation reaches ingest immediately.
 
 ## Locked-out admin
