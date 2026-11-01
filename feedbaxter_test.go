@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -310,8 +313,8 @@ func TestRunRejectsBadMode(t *testing.T) {
 func TestMigrateSQLite(t *testing.T) {
 	isolate(t)
 	got, err := Migrate(context.Background(), Options{})
-	if err != nil || !reflect.DeepEqual(got, []string{"0001_core"}) {
-		t.Fatalf("first Migrate = %v, %v; want [0001_core]", got, err)
+	if err != nil || !reflect.DeepEqual(got, []string{"0001_core", "0002_triage"}) {
+		t.Fatalf("first Migrate = %v, %v; want [0001_core 0002_triage]", got, err)
 	}
 	got, err = Migrate(context.Background(), Options{})
 	if err != nil || len(got) != 0 {
@@ -327,8 +330,8 @@ func TestMigrateWithExtension(t *testing.T) {
 		Postgres: "CREATE TABLE ext_demo (id BIGINT PRIMARY KEY)",
 	}
 	got, err := Migrate(context.Background(), Options{Migrations: []ext.Migration{m}})
-	if err != nil || !reflect.DeepEqual(got, []string{"0001_core", "ext_0001_demo"}) {
-		t.Fatalf("Migrate = %v, %v; want [0001_core ext_0001_demo]", got, err)
+	if err != nil || !reflect.DeepEqual(got, []string{"0001_core", "0002_triage", "ext_0001_demo"}) {
+		t.Fatalf("Migrate = %v, %v; want [0001_core 0002_triage ext_0001_demo]", got, err)
 	}
 }
 
@@ -353,5 +356,115 @@ func TestRunShutdownWithUnusedConn(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not return within 2s with an unused connection open")
+	}
+}
+
+var adminLine = regexp.MustCompile(`admin login admin@localhost temporary password: ([A-Za-z2-9]{20}) `)
+
+// TestRunAllAdminRoundTrip boots all mode and drives the whole self-host path:
+// first-boot admin, forced password change, channel and key creation through
+// the API, ingest, the inbox, and key revocation reaching ingest.
+func TestRunAllAdminRoundTrip(t *testing.T) {
+	isolateAll(t)
+	log := captureLog(t)
+	r := startRun(t, Options{Mode: "all"})
+	r.waitReady(t)
+
+	m := adminLine.FindStringSubmatch(log.String())
+	if m == nil || len(adminLine.FindAllString(log.String(), -1)) != 1 {
+		t.Fatalf("want exactly one admin line in the log:\n%s", log.String())
+	}
+	temp := m[1]
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	call := func(method, path, body string) (int, map[string]any) {
+		t.Helper()
+		var rd io.Reader
+		if body != "" {
+			rd = strings.NewReader(body)
+		}
+		req, err := http.NewRequest(method, r.url(path), rd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-Requested-With", "test")
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		raw, _ := io.ReadAll(resp.Body)
+		var out map[string]any
+		_ = json.Unmarshal(raw, &out)
+		return resp.StatusCode, out
+	}
+
+	if code, _ := call("POST", "/api/auth/login", `{"email":"admin@localhost","password":"`+temp+`"}`); code != 200 {
+		t.Fatalf("login = %d", code)
+	}
+	if code, body := call("GET", "/api/feedback", ""); code != 403 || body["error"] != "password_change_required" {
+		t.Fatalf("feedback before change = %d %v", code, body)
+	}
+	const newPW = "a much better password"
+	if code, body := call("POST", "/api/auth/password", `{"currentPassword":"`+temp+`","newPassword":"`+newPW+`"}`); code != 204 {
+		t.Fatalf("change password = %d %v", code, body)
+	}
+	code, ch := call("POST", "/api/channels", `{"name":"Web"}`)
+	if code != 201 {
+		t.Fatalf("create channel = %d %v", code, ch)
+	}
+	code, k := call("POST", "/api/channels/"+ch["id"].(string)+"/keys", "")
+	if code != 201 {
+		t.Fatalf("create key = %d %v", code, k)
+	}
+	secret, keyID := k["secret"].(string), k["key"].(map[string]any)["id"].(string)
+	if strings.Contains(log.String(), secret) || strings.Contains(log.String(), newPW) {
+		t.Fatalf("a secret reached the log:\n%s", log.String())
+	}
+
+	// A key made through the API reaches ingest through the key cache.
+	deadline := time.Now().Add(waitTimeout)
+	for {
+		if got := r.do(t, http.MethodPost, secret, `{"message":"hello from the API test"}`).StatusCode; got == http.StatusAccepted {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the new key never became valid at ingest")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for {
+		code, list := call("GET", "/api/feedback", "")
+		if code != 200 {
+			t.Fatalf("list = %d %v", code, list)
+		}
+		items := list["items"].([]any)
+		if len(items) == 1 && items[0].(map[string]any)["message"] == "hello from the API test" &&
+			items[0].(map[string]any)["channelName"] == "Web" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the feedback never showed up: %v", list)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if code, body := call("POST", "/api/keys/"+keyID+"/revoke", ""); code != 200 || body["revokedAt"] == nil {
+		t.Fatalf("revoke = %d %v", code, body)
+	}
+	revokeBy := time.Now().Add(5 * time.Second)
+	for {
+		got := r.do(t, http.MethodPost, secret, `{"message":"after revoke"}`).StatusCode
+		if got == http.StatusUnauthorized {
+			break
+		}
+		if time.Now().After(revokeBy) {
+			t.Fatalf("revoked key still answers %d after 5s", got)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err := r.stop(t); err != nil {
+		t.Fatalf("Run = %v, want nil", err)
 	}
 }

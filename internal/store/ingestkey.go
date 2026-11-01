@@ -146,3 +146,77 @@ func GetIngestKeyForCache(ctx context.Context, q Querier, d Dialect, keyID strin
 	}
 	return c, nil
 }
+
+const ingestKeyCols = "id, tenant_id, channel_id, prefix, hash, created_at, revoked_at"
+
+// ListIngestKeys returns the tenant's keys, newest first; channelID "" lists
+// every channel's keys.
+func ListIngestKeys(ctx context.Context, q Querier, d Dialect, tenantID, channelID string) ([]IngestKey, error) {
+	query := "SELECT " + ingestKeyCols + " FROM ingest_keys WHERE tenant_id = ?"
+	args := []any{tenantID}
+	if channelID != "" {
+		query += " AND channel_id = ?"
+		args = append(args, channelID)
+	}
+	rows, err := q.QueryContext(ctx, d.Rebind(query+" ORDER BY created_at DESC, id"), args...)
+	if err != nil {
+		return nil, fmt.Errorf("store: list ingest keys: %w", err)
+	}
+	defer rows.Close()
+	var out []IngestKey
+	for rows.Next() {
+		var k IngestKey
+		if err := rows.Scan(&k.ID, &k.TenantID, &k.ChannelID, &k.Prefix, &k.Hash, &k.CreatedAt, &k.RevokedAt); err != nil {
+			return nil, fmt.Errorf("store: list ingest keys: %w", err)
+		}
+		out = append(out, k)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: list ingest keys: %w", err)
+	}
+	return out, nil
+}
+
+// GetIngestKey returns ErrNotFound when the key is not in the tenant.
+func GetIngestKey(ctx context.Context, q Querier, d Dialect, tenantID, id string) (IngestKey, error) {
+	var k IngestKey
+	err := q.QueryRowContext(ctx, d.Rebind(
+		"SELECT "+ingestKeyCols+" FROM ingest_keys WHERE tenant_id = ? AND id = ?"), tenantID, id).
+		Scan(&k.ID, &k.TenantID, &k.ChannelID, &k.Prefix, &k.Hash, &k.CreatedAt, &k.RevokedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return IngestKey{}, fmt.Errorf("store: get ingest key: %w", ErrNotFound)
+	}
+	if err != nil {
+		return IngestKey{}, fmt.Errorf("store: get ingest key: %w", err)
+	}
+	return k, nil
+}
+
+// RevokeChannelKeys sets revoked_at on the channel's unrevoked keys and
+// returns the IDs of all of the channel's keys.
+func RevokeChannelKeys(ctx context.Context, q Querier, d Dialect, tenantID, channelID string, now int64) ([]string, error) {
+	_, err := q.ExecContext(ctx, d.Rebind(
+		"UPDATE ingest_keys SET revoked_at = ? WHERE tenant_id = ? AND channel_id = ? AND revoked_at IS NULL"),
+		now, tenantID, channelID)
+	if err != nil {
+		return nil, fmt.Errorf("store: revoke channel keys: %w", err)
+	}
+	rows, err := q.QueryContext(ctx, d.Rebind(
+		"SELECT id FROM ingest_keys WHERE tenant_id = ? AND channel_id = ? ORDER BY id"), tenantID, channelID)
+	if err != nil {
+		return nil, fmt.Errorf("store: revoke channel keys: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("store: revoke channel keys: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: revoke channel keys: %w", err)
+	}
+	return ids, nil
+}

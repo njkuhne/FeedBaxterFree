@@ -34,7 +34,7 @@ func parseErr(t *testing.T, m map[string]string) string {
 func TestDefaults(t *testing.T) {
 	c := mustParse(t, nil)
 	want := Config{
-		Mode: "all", HTTPAddr: ":8080", IngestAddr: ":8081", DataDir: "/data",
+		Mode: "all", HTTPAddr: ":8080", IngestAddr: ":8081", DataDir: "/data", AdminEmail: "admin@localhost",
 		Database:               Database{Driver: "sqlite", URL: "sqlite:///data/feedbaxter.db", Path: "/data/feedbaxter.db"},
 		KeyCacheResyncInterval: 5 * time.Minute, CounterFlushInterval: 5 * time.Second,
 		RetentionWindow: 17520 * time.Hour, RetentionCheckInterval: time.Hour,
@@ -52,7 +52,7 @@ func TestDefaults(t *testing.T) {
 func TestEveryVariableOverrides(t *testing.T) {
 	c := mustParse(t, map[string]string{
 		"MODE": "worker", "HTTP_ADDR": ":9000", "INGEST_ADDR": ":9001", "DATA_DIR": "/srv/x",
-		"DATABASE_URL": "postgres://u:p@h:5432/d", "NATS_URL": "nats://n:4222",
+		"DATABASE_URL": "postgres://u:p@h:5432/d", "NATS_URL": "nats://n:4222", "ADMIN_EMAIL": "Boss@Example.COM",
 		"KEY_CACHE_RESYNC_INTERVAL": "7m", "COUNTER_FLUSH_INTERVAL": "9s",
 		"RETENTION_WINDOW": "24h", "RETENTION_CHECK_INTERVAL": "30m",
 		"DAILY_LIMIT": "11", "MONTHLY_LIMIT": "22",
@@ -65,7 +65,7 @@ func TestEveryVariableOverrides(t *testing.T) {
 	want := Config{
 		Mode: "worker", HTTPAddr: ":9000", IngestAddr: ":9001", DataDir: "/srv/x",
 		Database: Database{Driver: "postgres", URL: "postgres://u:p@h:5432/d"}, NATSURL: "nats://n:4222",
-		KeyCacheResyncInterval: 7 * time.Minute, CounterFlushInterval: 9 * time.Second,
+		AdminEmail: "boss@example.com", KeyCacheResyncInterval: 7 * time.Minute, CounterFlushInterval: 9 * time.Second,
 		RetentionWindow: 24 * time.Hour, RetentionCheckInterval: 30 * time.Minute,
 		DailyLimit: 11, MonthlyLimit: 22, RateLimitPerKey: 7, RateLimitWindow: 3 * time.Second,
 		MaxBodyBytes: 9000, MaxMessageChars: 123, MaxMetadataBytes: 800,
@@ -130,6 +130,17 @@ func TestIntegersValidated(t *testing.T) {
 	msg := parseErr(t, map[string]string{"MAX_BODY_BYTES": "1000", "MAX_METADATA_BYTES": "1000"})
 	if !strings.Contains(msg, "MAX_METADATA_BYTES") {
 		t.Errorf("metadata >= body message: %q", msg)
+	}
+}
+
+func TestAdminEmailValidated(t *testing.T) {
+	for _, bad := range []string{"nobody", "a@b@c", "@x", "x@", "a b@c"} {
+		if msg := parseErr(t, map[string]string{"ADMIN_EMAIL": bad}); !strings.Contains(msg, "ADMIN_EMAIL:") {
+			t.Errorf("%q: message %q", bad, msg)
+		}
+	}
+	if c := mustParse(t, map[string]string{"ADMIN_EMAIL": " Me@Host "}); c.AdminEmail != "me@host" {
+		t.Errorf("AdminEmail = %q, want me@host", c.AdminEmail)
 	}
 }
 

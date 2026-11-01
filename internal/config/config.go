@@ -22,6 +22,7 @@ type Config struct {
 	DataDir    string
 	Database   Database
 	NATSURL    string // empty = embedded (only valid in mode "all")
+	AdminEmail string // email of the first-boot admin (self-host)
 
 	KeyCacheResyncInterval time.Duration
 	CounterFlushInterval   time.Duration
@@ -61,6 +62,7 @@ const (
 	defHTTPAddr               = ":8080"
 	defIngestAddr             = ":8081"
 	defDataDir                = "/data"
+	defAdminEmail             = "admin@localhost"
 	defDBFile                 = "feedbaxter.db"
 	defKeyCacheResyncInterval = "5m"
 	defCounterFlushInterval   = "5s"
@@ -123,6 +125,11 @@ func Parse(lookup func(key string) (string, bool)) (Config, error) {
 	c.IngestAddr = p.str("INGEST_ADDR", defIngestAddr)
 	c.DataDir = p.str("DATA_DIR", defDataDir)
 	c.Database = p.database(c.DataDir)
+	c.AdminEmail = strings.ToLower(p.str("ADMIN_EMAIL", defAdminEmail))
+	if strings.Count(c.AdminEmail, "@") != 1 || strings.HasPrefix(c.AdminEmail, "@") ||
+		strings.HasSuffix(c.AdminEmail, "@") || strings.ContainsAny(c.AdminEmail, " \t\r\n") {
+		p.fail("ADMIN_EMAIL", fmt.Sprintf("%q is not an email address", c.AdminEmail))
+	}
 
 	c.NATSURL, _ = p.get("NATS_URL")
 	if c.NATSURL == "" && contains(modes, c.Mode) && c.Mode != "all" {

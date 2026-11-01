@@ -32,7 +32,9 @@ type TenantResolver interface {
 // Authenticator produces the session principal for the api mode.
 // Self-host: password and sessions. SaaS: email flows (private).
 type Authenticator interface {
-	// Mount registers login, logout, password change and invite routes.
+	// Mount registers login, logout, password change and invite routes on the
+	// mux that serves /api/. Every request there has already passed the CSRF
+	// check and carries the resolved principal (if any) via PrincipalFrom.
 	Mount(mux *http.ServeMux, deps Deps)
 	// Principal resolves the session cookie of r to a Principal.
 	Principal(r *http.Request) (Principal, bool)
@@ -58,6 +60,46 @@ type Principal struct {
 	Role Role
 	// Via is how the caller authenticated: "ui" or "mcp".
 	Via string
+	// MustChangePassword is set while the user still has a temporary password.
+	// The api then refuses every route except login, logout, password change and /api/me.
+	MustChangePassword bool
+}
+
+type principalKey struct{}
+
+// WithPrincipal returns a context that carries p.
+func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	return context.WithValue(ctx, principalKey{}, p)
+}
+
+// PrincipalFrom returns the principal stored by WithPrincipal.
+func PrincipalFrom(ctx context.Context) (Principal, bool) {
+	p, ok := ctx.Value(principalKey{}).(Principal)
+	return p, ok
+}
+
+// Settings are the process settings an extension may read.
+type Settings struct {
+	// HTTPAddr is the listen address of the UI, API and MCP listener.
+	HTTPAddr string
+	// DataDir is the directory for the SQLite file and the embedded NATS store.
+	DataDir string
+	// Mode is ingest, worker, api or all.
+	Mode string
+}
+
+// SessionStore issues and resolves fb_session cookies. One implementation
+// (internal/api) owns the cookie rules for every Authenticator: a random
+// 32-byte token of which only the sha256 is stored, HttpOnly, SameSite=Lax,
+// Secure when the request is TLS or X-Forwarded-Proto is https, Path=/, and a
+// 30-day sliding expiry.
+type SessionStore interface {
+	// Start creates a session for the user and sets the cookie on w.
+	Start(w http.ResponseWriter, r *http.Request, userID, tenantID string) error
+	// Principal resolves the cookie of r; Via is "ui".
+	Principal(r *http.Request) (Principal, bool)
+	// End deletes the session of r, if any, and clears the cookie.
+	End(w http.ResponseWriter, r *http.Request) error
 }
 
 // LimitsSource decides daily and monthly limits for a tenant.
@@ -86,6 +128,10 @@ type Deps struct {
 	// Keys rewrites ingest key cache entries after key, channel, tenant or limit
 	// changes. Nil in the ingest and worker modes, which do not write the cache.
 	Keys KeyWriter
+	// Settings are the process settings, filled from the configuration.
+	Settings Settings
+	// Sessions issues and resolves session cookies. Nil outside the api and all modes.
+	Sessions SessionStore
 }
 
 // Migration is an extension migration, applied after core migrations in its own

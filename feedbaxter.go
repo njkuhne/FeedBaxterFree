@@ -13,12 +13,14 @@ import (
 	"time"
 
 	"github.com/njkuhne/feedbaxter/ext"
+	"github.com/njkuhne/feedbaxter/internal/api"
 	"github.com/njkuhne/feedbaxter/internal/config"
 	"github.com/njkuhne/feedbaxter/internal/ingest"
 	"github.com/njkuhne/feedbaxter/internal/ingest/keysync"
 	"github.com/njkuhne/feedbaxter/internal/processor"
 	"github.com/njkuhne/feedbaxter/internal/queue"
 	"github.com/njkuhne/feedbaxter/internal/selfhost"
+	"github.com/njkuhne/feedbaxter/internal/service"
 	"github.com/njkuhne/feedbaxter/internal/store"
 )
 
@@ -121,7 +123,10 @@ func Run(ctx context.Context, opts Options) (err error) {
 	if limits == nil {
 		limits = selfhost.LimitsFromConfig(cfg)
 	}
-	deps := ext.Deps{Logger: log}
+	deps := ext.Deps{
+		Logger:   log,
+		Settings: ext.Settings{HTTPAddr: cfg.HTTPAddr, DataDir: cfg.DataDir, Mode: cfg.Mode},
+	}
 	if db != nil {
 		deps.DB, deps.Dialect = db.SQL, string(db.Dialect)
 	}
@@ -141,9 +146,23 @@ func Run(ctx context.Context, opts Options) (err error) {
 	}()
 
 	if selfHost && writesKeys {
-		if _, err := selfhost.Bootstrap(ctx, db, kw, log, time.Now()); err != nil {
+		if _, err := selfhost.Bootstrap(ctx, db, kw, log, time.Now(), cfg.AdminEmail); err != nil {
 			return err
 		}
+	}
+	var apiHandler http.Handler
+	if writesKeys {
+		svc := &service.Service{DB: db, Keys: kw, Queue: objs, Log: log, Version: Version, Mode: cfg.Mode}
+		deps.Sessions = api.NewSessionStore(svc)
+		auth := opts.Authenticator
+		if auth == nil {
+			var tenants ext.TenantResolver = selfhost.TenantResolver{DB: db}
+			if opts.TenantResolver != nil {
+				tenants = opts.TenantResolver
+			}
+			auth = &selfhost.Auth{Svc: svc, Sessions: deps.Sessions, Tenants: tenants}
+		}
+		apiHandler = api.New(api.Config{Svc: svc, Auth: auth, Deps: deps, Log: log})
 	}
 	if writesKeys {
 		g.start("keysync", func() error { kw.Run(cctx, cfg.KeyCacheResyncInterval); return nil })
@@ -156,9 +175,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 		g.start("processor", func() error { return p.Run(cctx) })
 	}
 	if cfg.Mode == "api" || cfg.Mode == "all" {
-		if opts.Authenticator != nil {
-			opts.Authenticator.Mount(mux, deps)
-		}
+		mux.Handle("/api/", apiHandler)
 		if opts.MountRoutes != nil {
 			opts.MountRoutes(mux, deps)
 		}
@@ -232,4 +249,40 @@ func Migrate(ctx context.Context, opts Options) ([]string, error) {
 	}
 	log.Info("migrations applied", "count", len(applied), "versions", applied)
 	return applied, nil
+}
+
+// ResetAdmin gives an admin a new temporary password (see selfhost.ResetAdmin)
+// and returns the admin's email and the password. It opens the database from the
+// configuration and applies migrations first; the server need not be running.
+func ResetAdmin(ctx context.Context, opts Options, email string) (string, string, error) {
+	cfg, err := config.Load(nil)
+	if err != nil {
+		return "", "", err
+	}
+	db, err := store.Open(ctx, cfg.Database)
+	if err != nil {
+		return "", "", err
+	}
+	defer db.Close()
+	if _, err := store.Migrate(ctx, db, opts.Migrations); err != nil {
+		return "", "", err
+	}
+	var tenantID string
+	if opts.TenantResolver != nil {
+		tn, err := opts.TenantResolver.Default(ctx)
+		if err != nil {
+			return "", "", err
+		}
+		tenantID = tn.ID
+	} else {
+		tn, err := store.FirstTenant(ctx, db.SQL, db.Dialect)
+		if errors.Is(err, store.ErrNotFound) {
+			return "", "", errors.New("reset-admin: there is no organisation yet; start the server once first")
+		}
+		if err != nil {
+			return "", "", err
+		}
+		tenantID = tn.ID
+	}
+	return selfhost.ResetAdmin(ctx, db, tenantID, email, time.Now())
 }

@@ -99,7 +99,7 @@ type LimitsSource interface {
 type Limits struct { Daily, Monthly int64 } // 0 = unlimited
 
 // Deps is what extensions get: the DB handle and dialect, the KV writer for key-cache entries,
-// the NATS connection, the logger, and the config. Exported types only.
+// the session store, the logger, and Settings (a small exported view of config). Exported types only.
 type Deps struct { ... }
 
 type Options struct {
@@ -184,14 +184,14 @@ Schema is the spec's data model table. Indexes: `(tenant_id, status, received_at
 - `net/http` with Go 1.22+ patterns. JSON in and out. Every handler gets a `Principal` from the `Authenticator` or returns `401`.
 - Sessions: `sessions` table (id, user_id, expires_at, created_at); cookie `fb_session`, `HttpOnly`, `Secure` when the request is HTTPS, `SameSite=Lax`, 30-day expiry sliding. Mutating requests require `Sec-Fetch-Site` of `same-origin`/`none` or an `X-Requested-With` header; otherwise `403`.
 - Passwords: argon2id (`golang.org/x/crypto/argon2`), parameters t=1, m=64 MiB, p=4, 16-byte salt, encoded PHC string.
-- Role checks are one function, `requireRole(admin)`, used by every admin-only route from the spec's capability table.
+- Business rules live in `internal/service`; every method that takes a principal starts with `requireUser` or `requireAdmin`, and `requireAdmin` is the only role check. `internal/api` only maps HTTP to service calls and errors, so the MCP server reuses the same checks.
 - Export: streams CSV or JSON from a cursor, honours the inbox filter parameters.
 - Ops endpoint `/api/ops`: queue depth, oldest message age, DLQ count, counter snapshot, DB size (admin only).
 - Static UI: `go:embed web/dist`; SPA fallback to `index.html`; immutable cache headers on hashed assets; fonts served from the same embed.
 
 ## 10. MCP
 
-`internal/mcp` uses `github.com/modelcontextprotocol/go-sdk`, Streamable HTTP mounted at `/mcp`. Auth middleware: `Authorization: Bearer <PAT>` → `personal_access_tokens` row by hash → `Principal{Via: "mcp"}`. Tools are thin wrappers over the same `internal/api` service functions, so permission checks and history (`via: mcp`) are shared, not duplicated. Bulk calls accept up to 500 IDs.
+`internal/mcp` uses `github.com/modelcontextprotocol/go-sdk`, Streamable HTTP mounted at `/mcp`. Auth middleware: `Authorization: Bearer <PAT>` → `personal_access_tokens` row by hash → `Principal{Via: "mcp"}`. Tools are thin wrappers over `internal/service`, so permission checks and history (`via: mcp`) are shared, not duplicated. Bulk calls accept up to 500 IDs.
 
 ## 11. Config
 

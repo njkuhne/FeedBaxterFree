@@ -30,7 +30,7 @@ func TestMigrateFresh(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := []string{"0001_core"}; !reflect.DeepEqual(got, want) {
+		if want := []string{"0001_core", "0002_triage"}; !reflect.DeepEqual(got, want) {
 			t.Fatalf("applied %v, want %v", got, want)
 		}
 		for _, tbl := range coreTables {
@@ -52,8 +52,8 @@ func TestMigrateIdempotent(t *testing.T) {
 		if len(got) != 0 {
 			t.Errorf("second call applied %v", got)
 		}
-		if n := count(t, db, "schema_migrations"); n != 1 {
-			t.Errorf("schema_migrations rows = %d, want 1", n)
+		if n := count(t, db, "schema_migrations"); n != 2 {
+			t.Errorf("schema_migrations rows = %d, want 2", n)
 		}
 	})
 }
@@ -70,7 +70,7 @@ func TestMigrateExtension(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := []string{"0001_core", "ext_0001_demo"}; !reflect.DeepEqual(got, want) {
+		if want := []string{"0001_core", "0002_triage", "ext_0001_demo"}; !reflect.DeepEqual(got, want) {
 			t.Fatalf("applied %v, want %v", got, want)
 		}
 		count(t, db, "demo")

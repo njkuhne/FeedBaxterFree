@@ -42,6 +42,7 @@ Defaults match `.env.example`.
 | `MODE` | `all` | `all`, `ingest`, `worker` or `api`. Split modes need `NATS_URL` and a shared database. |
 | `HTTP_ADDR` | `:8080` | Listener for UI, API and (in `all`) ingest. |
 | `INGEST_ADDR` | `:8081` | Separate ingest listener in `ingest` mode. |
+| `ADMIN_EMAIL` | `admin@localhost` | Email of the admin created on first boot (self-host, `api` and `all`). Read only when the database has no users; changing it later does not rename or add anyone. Must be a valid email address. |
 | `DATA_DIR` | `/data` | SQLite file and embedded NATS store. Must be persistent. |
 | `DATABASE_URL` | SQLite in `DATA_DIR` | A `postgres://` URL switches to Postgres, which allows several workers. |
 | `NATS_URL` | empty | Empty uses the embedded server (`all` only); set it to use an external NATS. |
@@ -69,11 +70,26 @@ Defaults match `.env.example`.
 - Rising oldest-message age means processors cannot keep up: add a worker replica (Postgres only; SQLite has one writer).
 - A DLQ count above 0 means inspect `FEEDBACK_DLQ`; the `FB-Error` header on each message says why.
 - `/healthz` returns 200 whenever the process serves. `/readyz` returns 503 until startup has finished; for ingest that includes the key-cache replay and loading the counters. Use `/readyz` for load-balancer checks and `/healthz` for liveness.
-- Queue depth, oldest-message age and DLQ count will be shown on `/api/ops` (admin only, M2). Until then: depth is the `FEEDBACK` stream message count and the oldest age is the timestamp of its first message (`nats stream info FEEDBACK` against an external NATS).
+- Queue depth, oldest-message age and DLQ count are returned by `GET /api/ops` (admin session required; see `docs/API.md`): `queue.depth`, `queue.oldestAgeSeconds`, `queue.dlq`. The same response has this month's and today's submission counters, `dbSizeBytes`, `version`, `mode` and `dialect`. Against an external NATS the same numbers come from `nats stream info FEEDBACK` and `FEEDBACK_DLQ`.
 
 ## First boot
 
-On first start an ingest key is created and logged once, for example `ingest key for channel Default: fbx_…`. Only its hash is stored, so it cannot be retrieved later: copy it from the first-boot log. Key management arrives in M2.
+On first start the log shows two lines, once each:
+
+    ingest key for channel Default: fbx_…
+    admin login admin@localhost temporary password: … (you must change it at first login)
+
+The admin email is `ADMIN_EMAIL`. The first login forces a password change. Only hashes are stored, so neither value can be retrieved later: copy them from the first-boot log (`docker compose logs feedbaxter`). If the log is lost, use `reset-admin` below for the password; for the key, create a new one in the admin UI (or `POST /api/channels/{id}/keys`) and revoke the old one. The first-boot key is an ordinary key and can be revoked the same way (`POST /api/keys/{id}/revoke`).
+
+Ingest keys are managed by admins through the API and UI: create a key per channel, revoke it when it leaks or an app is retired. Revocation reaches ingest immediately.
+
+## Locked-out admin
+
+Run inside the container, against the same data volume:
+
+    docker compose exec feedbaxter /feedbaxter reset-admin [--email=<admin email>]
+
+It prints `temporary password for <email>: …`. Without `--email` it resets the first admin (oldest by creation time); with it, the address must belong to an admin. The password must be changed at next login and all of that admin's sessions end. If the database has no users at all, it creates an admin (the given email, or `admin@localhost`). The container must be running; the command talks to the database directly and does not need the HTTP port.
 
 ## Shutdown
 

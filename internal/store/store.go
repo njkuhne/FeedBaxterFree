@@ -89,3 +89,16 @@ func redact(err error, rawURL string) string {
 	}
 	return msg
 }
+
+// DatabaseSize returns the size of the database in bytes.
+func DatabaseSize(ctx context.Context, db *DB) (int64, error) {
+	query := "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()"
+	if db.Dialect == Postgres {
+		query = "SELECT pg_database_size(current_database())"
+	}
+	var n int64
+	if err := db.SQL.QueryRowContext(ctx, query).Scan(&n); err != nil {
+		return 0, fmt.Errorf("store: database size: %w", err)
+	}
+	return n, nil
+}

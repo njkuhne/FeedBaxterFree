@@ -329,3 +329,11 @@ func (c *Counters) Snapshot() map[string][2]int64 {
 	}
 	return out
 }
+
+// DayKey is the counters-bucket key of the tenant's UTC day containing now.
+func DayKey(tenantID string, now time.Time) string { return dayKey(tenantID, now) }
+
+// MonthKey is the counters-bucket key of the tenant's billing month containing now.
+func MonthKey(tenantID string, billingDay int, now time.Time) string {
+	return monthKey(tenantID, billingDay, now)
+}

@@ -2,10 +2,24 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"io"
+	"log/slog"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/njkuhne/feedbaxter/internal/config"
+	"github.com/njkuhne/feedbaxter/internal/selfhost"
+	"github.com/njkuhne/feedbaxter/internal/store"
 )
+
+type noKeys struct{}
+
+func (noKeys) SyncKey(context.Context, string) error    { return nil }
+func (noKeys) SyncTenant(context.Context, string) error { return nil }
 
 func do(args ...string) (int, string, string) {
 	var out, errb bytes.Buffer
@@ -42,13 +56,6 @@ func TestServeBadMode(t *testing.T) {
 	}
 }
 
-func TestResetAdminNotImplemented(t *testing.T) {
-	code, _, errs := do("reset-admin")
-	if code != 1 || !strings.Contains(errs, "M2") {
-		t.Fatalf("code=%d stderr=%q", code, errs)
-	}
-}
-
 func isolate(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
@@ -65,5 +72,46 @@ func TestMigrateCommand(t *testing.T) {
 	code, out, errs = do("migrate")
 	if code != 0 || !strings.Contains(out, "schema is up to date") {
 		t.Fatalf("second: code=%d out=%q stderr=%q", code, out, errs)
+	}
+}
+
+func TestResetAdminWithoutOrganisation(t *testing.T) {
+	isolate(t)
+	code, out, errs := do("reset-admin")
+	if code != 1 || out != "" || !strings.Contains(errs, "start the server once first") {
+		t.Fatalf("code=%d out=%q stderr=%q", code, out, errs)
+	}
+}
+
+func TestResetAdminCommand(t *testing.T) {
+	isolate(t)
+	if code, _, errs := do("migrate"); code != 0 {
+		t.Fatalf("migrate: %d %s", code, errs)
+	}
+	db, err := store.Open(context.Background(), config.Database{Driver: "sqlite", Path: "fb.db"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if _, err := selfhost.Bootstrap(context.Background(), db, noKeys{}, log, time.Now(), "root@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+
+	want := regexp.MustCompile(`^temporary password for root@example\.com: [A-Za-z2-9]{20}\n$`)
+	if code, out, errs := do("reset-admin"); code != 0 || !want.MatchString(out) {
+		t.Fatalf("reset-admin: code=%d out=%q stderr=%q", code, out, errs)
+	}
+	if code, out, errs := do("reset-admin", "--email=ROOT@example.com"); code != 0 || !want.MatchString(out) {
+		t.Fatalf("reset-admin --email: code=%d out=%q stderr=%q", code, out, errs)
+	}
+	if code, _, errs := do("reset-admin", "--email=nobody@example.com"); code != 1 || errs == "" {
+		t.Fatalf("unknown email: code=%d stderr=%q", code, errs)
+	}
+	if code, _, _ := do("reset-admin", "--bogus"); code != 2 {
+		t.Fatalf("bad flag: code=%d, want 2", code)
+	}
+	if code, _, _ := do("reset-admin", "extra"); code != 2 {
+		t.Fatalf("extra arg: code=%d, want 2", code)
 	}
 }
