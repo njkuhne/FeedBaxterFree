@@ -18,3 +18,9 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 | "Monthly limit reached" state in the UI | M3 | The empty state exists in the design but no API endpoint exposes the tenant's limits or whether it is capped. Add a limits field to `/api/me` or `/api/ops` with the SaaS work in M6 and wire the state then. |
 | Compose build reports `version=dev` | M3 | `deploy/docker-compose.yml` passes no `VERSION` build argument. Pass it from the release workflow once releases exist. |
 | Metadata separators read aloud | M3 | The inbox row's "·" separators are plain text; a screen reader reads them. Mark them `aria-hidden` in a polish pass. |
+| No per-token rate limit on `/mcp` or `/api` | M4 | Neither endpoint is limited per token or per user. Ingest is limited per key; add the same for authenticated callers before SaaS launch (M6). |
+| No CORS on `/mcp` | M4 | Browser-based MCP clients cannot connect. Desktop and CLI clients are unaffected. |
+| PAT-only auth on `/mcp`, no OAuth | M4 | Clients that require OAuth discovery cannot connect. Revisit if customers ask. |
+| No export tool over MCP | M4 | `list_feedback` pages instead (up to 200 per call). The UI and `GET /api/feedback/export` cover full exports. |
+| No request logging on `/mcp` | M4 | Only errors are logged, with no tokens or inputs. Add a quiet access line (tool name, status, duration) if operators need it. |
+| Intermittent `internal/processor` test failure | M4 | Seen once during M4 in `make test`: "dead-letter publish failed … nats: no response from stream". Passed on rerun and the test was not identified. Capture the test name next time it happens. |

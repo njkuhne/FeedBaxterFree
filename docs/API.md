@@ -16,7 +16,7 @@ The JSON API behind the admin UI. Ingest (`POST /v1/feedback`) is a separate API
 
 Sign in with `POST /api/auth/login`. The response sets the `fb_session` cookie: HttpOnly, SameSite=Lax, path `/`, 30-day sliding expiry, `Secure` when the request came over TLS or with `X-Forwarded-Proto: https`. The server-side expiry slides on use; `GET /api/me` also re-issues the cookie with a fresh 30 days, so the UI should call it on every page load. An expired or unknown session is `401 unauthenticated`; send the user to the sign-in screen.
 
-Personal access tokens (`fbx_pat_…`) are for the MCP server at `/mcp` and are never accepted on `/api`.
+Personal access tokens (`fbx_pat_…`) are for the MCP server at `/mcp` and are never accepted on `/api`. See [MCP.md](MCP.md).
 
 **CSRF.** Every request except GET, HEAD and OPTIONS must either carry `Sec-Fetch-Site: same-origin` (or `none`), or a non-empty `X-Requested-With` header. Otherwise the answer is `403 csrf`. The UI should always send `X-Requested-With: fetch`. This applies to login too.
 
@@ -166,7 +166,7 @@ Errors: 400 "Enter a valid email address." (also over 254 characters), 400 "Role
 
 ### Personal access tokens
 
-Each user manages only their own. Tokens are for the MCP server and inherit the owner's role.
+Each user manages only their own. Tokens are for the MCP server and inherit the owner's role. How to use one is in [MCP.md](MCP.md).
 
 | Method and path | Role | Success |
 | --- | --- | --- |

@@ -502,3 +502,42 @@ func TestRunAllServesUI(t *testing.T) {
 		t.Fatalf("GET /api/me = %d %v, want 401 unauthenticated", resp.StatusCode, body)
 	}
 }
+
+func TestRunAllMountsMCP(t *testing.T) {
+	isolateAll(t)
+	r := startRun(t, Options{Mode: "all"})
+	r.waitReady(t)
+
+	req, err := http.NewRequest(http.MethodPost, r.url("/mcp"), strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct{ Error string }
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized || body.Error != "unauthenticated" {
+		t.Fatalf("POST /mcp = %d %q, want 401 unauthenticated", resp.StatusCode, body.Error)
+	}
+
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		req, err := http.NewRequest(method, r.url("/mcp/x"), strings.NewReader("{}"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err = http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body.Error = ""
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound || body.Error != "not_found" {
+			t.Fatalf("%s /mcp/x = %d %q, want 404 not_found", method, resp.StatusCode, body.Error)
+		}
+	}
+}

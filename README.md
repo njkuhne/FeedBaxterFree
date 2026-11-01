@@ -54,6 +54,7 @@ Run `make help` for the full list.
 
 - [Product spec](docs/SPEC.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [MCP server](docs/MCP.md)
 - [Decision records](docs/adr/)
 - [Component design briefs](docs/design/)
 

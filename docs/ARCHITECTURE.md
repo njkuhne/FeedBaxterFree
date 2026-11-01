@@ -191,7 +191,7 @@ Schema is the spec's data model table. Indexes: `(tenant_id, status, received_at
 
 ## 10. MCP
 
-`internal/mcp` uses `github.com/modelcontextprotocol/go-sdk`, Streamable HTTP mounted at `/mcp`. Auth middleware: `Authorization: Bearer <PAT>` → `personal_access_tokens` row by hash → `Principal{Via: "mcp"}`. Tools are thin wrappers over `internal/service`, so permission checks and history (`via: mcp`) are shared, not duplicated. Bulk calls accept up to 500 IDs.
+`internal/mcp` uses `github.com/modelcontextprotocol/go-sdk`, Streamable HTTP mounted at `/mcp`. Auth middleware: `Authorization: Bearer <PAT>` → `personal_access_tokens` row by hash → `Principal{Via: "mcp"}`. Tools are thin wrappers over `internal/service`, so permission checks and history (`via: mcp`) are shared, not duplicated. Bulk calls accept up to 500 IDs. The transport is stateless with JSON responses (no sessions, no streaming). The SDK's localhost DNS-rebinding guard is turned off because every request needs a bearer token and the guard breaks reverse proxies on the same host. The handler is mounted at `/mcp` and `/mcp/` so every sub-path answers 404.
 
 ## 11. Config
 

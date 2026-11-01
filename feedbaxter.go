@@ -18,6 +18,7 @@ import (
 	"github.com/njkuhne/feedbaxter/internal/config"
 	"github.com/njkuhne/feedbaxter/internal/ingest"
 	"github.com/njkuhne/feedbaxter/internal/ingest/keysync"
+	"github.com/njkuhne/feedbaxter/internal/mcp"
 	"github.com/njkuhne/feedbaxter/internal/processor"
 	"github.com/njkuhne/feedbaxter/internal/queue"
 	"github.com/njkuhne/feedbaxter/internal/selfhost"
@@ -154,8 +155,9 @@ func Run(ctx context.Context, opts Options) (err error) {
 		}
 	}
 	var apiHandler http.Handler
+	var svc *service.Service // shared by the API and MCP handlers
 	if writesKeys {
-		svc := &service.Service{DB: db, Keys: kw, Queue: objs, Log: log, Version: Version, Mode: cfg.Mode}
+		svc = &service.Service{DB: db, Keys: kw, Queue: objs, Log: log, Version: Version, Mode: cfg.Mode}
 		deps.Sessions = api.NewSessionStore(svc)
 		auth := opts.Authenticator
 		if auth == nil {
@@ -179,6 +181,12 @@ func Run(ctx context.Context, opts Options) (err error) {
 	}
 	if cfg.Mode == "api" || cfg.Mode == "all" {
 		mux.Handle("/api/", apiHandler)
+		// Mounted at both patterns so the handler's own path check answers every
+		// /mcp/... sub-path, for any method, with a JSON 404 (the UI fallthrough
+		// would answer POST with 405).
+		mcpHandler := mcp.New(svc, log)
+		mux.Handle("/mcp", mcpHandler)
+		mux.Handle("/mcp/", mcpHandler)
 		// The admin UI answers everything else; more specific patterns (/healthz,
 		// /readyz, /api/, /v1/feedback, extension routes) still win.
 		if sub, err := fs.Sub(web.Dist, "dist"); err == nil {
