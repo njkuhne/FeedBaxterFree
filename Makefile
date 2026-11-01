@@ -12,6 +12,8 @@ SIZE_LIMIT ?= 33554432
 # 48 MiB.
 RSS_LIMIT  ?= 50331648
 DEV_PORT   ?= 8090
+# Host port for make local.
+LOCAL_PORT ?= 8095
 # Data directory for make dev, relative to the repo (a second dev server needs its own).
 DEV_DATA   ?= data
 PG_URL_DEV  = postgres://feedbaxter:feedbaxter@postgres:5432/feedbaxter_test?sslmode=disable
@@ -20,7 +22,7 @@ COMPOSE_DEV = docker compose -f deploy/compose.dev.yml
 HOST_GOOS   = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 HOST_GOARCH = $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 
-.PHONY: help build dev test test-pg vet lint image size-check clean ui dev-ui sdk-web
+.PHONY: help build dev test test-pg vet lint image size-check clean ui dev-ui sdk-web local
 
 .DEFAULT_GOAL := help
 
@@ -63,6 +65,12 @@ lint: vet ## Alias for vet
 
 image: ## Build the scratch Docker image (UI included)
 	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) -t feedbaxter:$(VERSION) -t feedbaxter:latest .
+
+local: ## Build a native image (feedbaxter:local) and run it on localhost:LOCAL_PORT with a persistent volume
+	docker build -f deploy/Dockerfile --platform linux/$(HOST_GOARCH) --build-arg VERSION=$(VERSION) -t feedbaxter:local .
+	-docker rm -f feedbaxter-local >/dev/null 2>&1
+	docker run -d --name feedbaxter-local --restart unless-stopped -p 127.0.0.1:$(LOCAL_PORT):8080 -v feedbaxter-local-data:/data feedbaxter:local
+	@echo "FeedBaxter is at http://127.0.0.1:$(LOCAL_PORT)  (first-boot lines: docker logs feedbaxter-local)"
 
 rss-check: ## Fail if the image's RSS, measured after a first boot and a login, exceeds RSS_LIMIT
 	@c=fbx-rss-$$$$; \

@@ -5,6 +5,8 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -113,5 +115,80 @@ func TestResetAdminCommand(t *testing.T) {
 	}
 	if code, _, _ := do("reset-admin", "extra"); code != 2 {
 		t.Fatalf("extra arg: code=%d, want 2", code)
+	}
+}
+
+func TestReadyURL(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{":8080", "http://127.0.0.1:8080/readyz"},
+		{"0.0.0.0:8080", "http://127.0.0.1:8080/readyz"},
+		{"[::]:8080", "http://127.0.0.1:8080/readyz"},
+		{"127.0.0.1:9000", "http://127.0.0.1:9000/readyz"},
+		{"10.0.0.5:9000", "http://10.0.0.5:9000/readyz"},
+		{"[::1]:8080", "http://[::1]:8080/readyz"},
+	}
+	for _, c := range cases {
+		got, err := readyURL(c.in)
+		if err != nil || got != c.want {
+			t.Errorf("readyURL(%q) = %q, %v; want %q", c.in, got, err, c.want)
+		}
+	}
+	if got, err := readyURL("nonsense"); err == nil {
+		t.Errorf("readyURL(nonsense) = %q, want error", got)
+	}
+}
+
+func statusServer(t *testing.T, status int) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/readyz" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(status)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestCheckReady(t *testing.T) {
+	ctx := context.Background()
+	if err := checkReady(ctx, statusServer(t, 200).URL+"/readyz"); err != nil {
+		t.Errorf("200: %v", err)
+	}
+	if err := checkReady(ctx, statusServer(t, 503).URL+"/readyz"); err == nil || !strings.Contains(err.Error(), "503") {
+		t.Errorf("503: err=%v", err)
+	}
+	closed := httptest.NewServer(http.NotFoundHandler())
+	url := closed.URL + "/readyz"
+	closed.Close()
+	if err := checkReady(ctx, url); err == nil {
+		t.Error("closed server: want error")
+	}
+}
+
+func TestHealthcheckCommand(t *testing.T) {
+	isolate(t)
+	ok := statusServer(t, 200)
+	t.Setenv("HTTP_ADDR", strings.TrimPrefix(ok.URL, "http://"))
+	if code, out, errs := do("healthcheck"); code != 0 || out != "" || errs != "" {
+		t.Fatalf("200: code=%d out=%q stderr=%q", code, out, errs)
+	}
+
+	bad := statusServer(t, 503)
+	t.Setenv("HTTP_ADDR", strings.TrimPrefix(bad.URL, "http://"))
+	code, out, errs := do("healthcheck")
+	if code != 1 || out != "" || strings.Count(errs, "\n") != 1 || !strings.Contains(errs, "503") {
+		t.Fatalf("503: code=%d out=%q stderr=%q", code, out, errs)
+	}
+
+	if code, _, _ := do("healthcheck", "extra"); code != 2 {
+		t.Fatalf("extra arg: code=%d, want 2", code)
+	}
+}
+
+func TestHelpMentionsHealthcheck(t *testing.T) {
+	if code, out, _ := do("help"); code != 0 || !strings.Contains(out, "healthcheck") {
+		t.Fatalf("code=%d out=%q", code, out)
 	}
 }
