@@ -372,15 +372,15 @@ v1 is text feedback in, triage out, with billing on SaaS. Everything else waits.
 
 **In v1**
 
-- [ ] Ingest API with key cache, quota counters and rejection codes
-- [ ] JetStream queue (embedded and standalone) and scalable processors
-- [ ] BFF: orgs, users, roles, channels, ingest keys, personal access tokens
-- [ ] Admin UI: inbox, statuses, tags, bulk actions, per-user view, export, built to the Styleguide
+- [x] Ingest API with key cache, quota counters and rejection codes
+- [x] JetStream queue (embedded and standalone) and scalable processors
+- [x] BFF: orgs, users, roles, channels, ingest keys, personal access tokens
+- [x] Admin UI: inbox, statuses, tags, bulk actions, per-user view, export, built to the Styleguide
 - [ ] Brand assets: Baxter full and small marks as SVG, favicon, app icon, Fraunces and Inter bundled, Baxter for onboarding, empty inbox and the monthly limit
-- [ ] MCP server
+- [x] MCP server
 - [ ] Web SDK and Swift SDK (iOS and macOS)
 - [ ] SaaS layer: sign-up, email invites and resets, Stripe, plans, super-admin
-- [ ] Self-host Docker image with first-boot admin and `reset-admin`
+- [x] Self-host Docker image with first-boot admin and `reset-admin`
 - [ ] Retention job, per-user deletion, org deletion
 - [ ] Terms of Service and privacy policy
 
