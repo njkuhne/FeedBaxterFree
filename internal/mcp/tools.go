@@ -169,7 +169,7 @@ func (h *handler) stats(ctx context.Context, _ *sdk.CallToolRequest, in statsIn)
 	if err != nil {
 		return nil, statsOut{}, h.toolErr("stats", err)
 	}
-	st, err := h.svc.Stats(ctx, principal(ctx), from, to)
+	st, err := h.svc.Stats(ctx, principal(ctx), service.Filter{From: from, To: to})
 	if err != nil {
 		return nil, statsOut{}, h.toolErr("stats", err)
 	}

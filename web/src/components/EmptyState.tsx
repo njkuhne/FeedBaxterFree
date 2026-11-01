@@ -6,12 +6,14 @@ interface EmptyStateProps {
   body: string;
   action?: ReactNode;
   headingRef?: Ref<HTMLHeadingElement>;
+  /** Baxter shows for inbox zero and onboarding only; filtered empties pass false. */
+  mark?: boolean;
 }
 
-export function EmptyState({ heading, body, action, headingRef }: EmptyStateProps) {
+export function EmptyState({ heading, body, action, headingRef, mark = true }: EmptyStateProps) {
   return (
     <div className="empty">
-      <BaxterFull size={128} />
+      {mark ? <BaxterFull size={128} /> : null}
       <h2 ref={headingRef} tabIndex={-1} className="empty-heading">
         {heading}
       </h2>

@@ -46,7 +46,7 @@ func capabilityRows() []call {
 			return err
 		}},
 		{"stats", false, func(t *testing.T, f *fixture, p ext.Principal) error {
-			_, err := f.svc.Stats(ctx, p, nil, nil)
+			_, err := f.svc.Stats(ctx, p, Filter{})
 			return err
 		}},
 		{"set status", false, func(t *testing.T, f *fixture, p ext.Principal) error {
@@ -189,7 +189,7 @@ func TestUnauthenticatedPrincipal(t *testing.T) {
 			rec("RemoveTags", err)
 			_, err = s.ListTags(ctx, p)
 			rec("ListTags", err)
-			_, err = s.Stats(ctx, p, &now, &now)
+			_, err = s.Stats(ctx, p, Filter{From: &now, To: &now})
 			rec("Stats", err)
 			rec("DeleteFeedback", s.DeleteFeedback(ctx, p, "x"))
 			_, err = s.DeleteUserFeedback(ctx, p, "x")
@@ -290,7 +290,7 @@ func TestTenantIsolation(t *testing.T) {
 		if seen != 0 {
 			t.Fatal("export leaked")
 		}
-		st, _ := s.Stats(ctx, adminB, nil, nil)
+		st, _ := s.Stats(ctx, adminB, Filter{})
 		if st.Total != 0 {
 			t.Fatal("stats leaked")
 		}

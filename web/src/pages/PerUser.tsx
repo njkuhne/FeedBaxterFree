@@ -5,11 +5,11 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmailWarning } from "../components/EmailWarning";
 import { PageTitle } from "../components/PageTitle";
 import { useToast } from "../components/Toast";
-import { deleteByUser, listChannels } from "../lib/endpoints";
+import { deleteByUser, listChannels, listTags } from "../lib/endpoints";
 import { defaultFilters } from "../lib/filters";
 import { plural } from "../lib/format";
-import type { Filters } from "../lib/types";
-import { ExportLinks } from "../feedback/ExportLinks";
+import type { Filters, TagCount } from "../lib/types";
+import { ExportMenu } from "../feedback/ExportMenu";
 import { FeedbackList } from "../feedback/FeedbackList";
 import { clearFeedbackCache } from "../feedback/useFeedbackList";
 import { useAuth } from "../shell/AuthProvider";
@@ -22,6 +22,7 @@ export default function PerUser() {
   usePageTitle(`Feedback from ${userId}`);
   const filters = useMemo<Filters>(() => ({ ...defaultFilters, status: "all", userId }), [userId]);
   const [channelCount, setChannelCount] = useState(0);
+  const [tags, setTags] = useState<TagCount[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [round, setRound] = useState(0);
 
@@ -29,20 +30,25 @@ export default function PerUser() {
     listChannels()
       .then((c) => setChannelCount(c.items.length))
       .catch(() => undefined);
+    listTags()
+      .then((t) => setTags(t.items))
+      .catch(() => undefined);
   }, []);
 
   return (
     <>
       <div className="page-head">
         <PageTitle>Feedback from {userId}</PageTitle>
-        <ExportLinks filters={filters} />
+        <ExportMenu filters={filters} count={null} />
       </div>
       <EmailWarning userId={userId} />
       <FeedbackList
         key={`${userId}:${round}`}
         filters={filters}
         showChannel={channelCount >= 2}
+        tags={tags}
         origin="user"
+        originLabel={userId}
         renderEmpty={(ref) => (
           <p className="empty-plain" ref={ref} tabIndex={-1}>
             No feedback from this user.

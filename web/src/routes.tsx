@@ -1,6 +1,7 @@
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import { AnnouncerProvider } from "./components/Announcer";
 import { ToastProvider } from "./components/Toast";
+import { UndoProvider } from "./feedback/undo";
 import { AuthProvider } from "./shell/AuthProvider";
 import { AdminOnly, RequireAuth } from "./shell/Shell";
 import Channels from "./pages/Channels";
@@ -18,9 +19,11 @@ function Providers() {
   return (
     <ToastProvider>
       <AnnouncerProvider>
-        <AuthProvider>
-          <Outlet />
-        </AuthProvider>
+        <UndoProvider>
+          <AuthProvider>
+            <Outlet />
+          </AuthProvider>
+        </UndoProvider>
       </AnnouncerProvider>
     </ToastProvider>
   );

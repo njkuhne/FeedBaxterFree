@@ -30,3 +30,17 @@ export function duration(seconds: number): string {
 export function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+const PLATFORM_NAMES: Record<string, string> = {
+  ios: "iOS",
+  macos: "macOS",
+  ipados: "iPadOS",
+  web: "Web",
+  android: "Android",
+};
+
+/** Display name for a platform: "ios" -> "iOS". Unknown platforms are shown exactly as sent. */
+export function platformName(platform: string): string {
+  const known = PLATFORM_NAMES[platform.toLowerCase()];
+  return known ?? platform;
+}

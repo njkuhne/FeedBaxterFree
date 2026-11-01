@@ -363,7 +363,7 @@ func TestFeedbackStats(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		s, err := store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, nil, nil)
+		s, err := store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, store.FeedbackFilter{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -391,17 +391,136 @@ func TestFeedbackStats(t *testing.T) {
 			t.Errorf("by tag: %+v", s.ByTag)
 		}
 
-		s, err = store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, i64(200), i64(400))
+		s, err = store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, store.FeedbackFilter{From: i64(200), To: i64(400)})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if s.Total != 2 || s.ByStatus["reviewed"] != 2 || len(s.ByStatus) != 4 || len(s.ByTag) != 1 || s.ByTag[0].Count != 2 {
 			t.Errorf("ranged: %+v", s)
 		}
-		s, _ = store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, i64(1000), nil)
+		s, _ = store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, store.FeedbackFilter{From: i64(1000)})
 		if s.Total != 0 || len(s.ByStatus) != 4 || len(s.ByChannel) != 0 || len(s.ByTag) != 0 {
 			t.Errorf("empty range: %+v", s)
 		}
+	})
+}
+
+func TestFeedbackStatsFilters(t *testing.T) {
+	storetest.ForEachDialect(t, func(t *testing.T, db *store.DB) {
+		ctx, d := context.Background(), db.Dialect
+		tn, main := newTenant(t, db, "acme")
+		web, _ := store.CreateChannel(ctx, db.SQL, d, tn.ID, "web", 1)
+		other, och := newTenant(t, db, "other")
+		seedFB(t, db, tn, main.ID, "fb_1", "Safari crash on login", ptr("u1"), 100)
+		seedFB(t, db, tn, main.ID, "fb_2", "100% broken sync", ptr("u2"), 200)
+		seedFB(t, db, tn, web.ID, "fb_3", "Dark mode idea", ptr("u1"), 300)
+		seedFB(t, db, tn, web.ID, "fb_4", "Login slow on SAFARI", ptr("u1"), 400)
+		seedFB(t, db, tn, web.ID, "fb_5", "plain note", nil, 500)
+		seedFB(t, db, other, och.ID, "fb_o", "Safari crash", ptr("u1"), 150)
+		mustExec(t, db, "UPDATE feedback SET status = 'reviewed' WHERE id = 'fb_2'")
+		mustExec(t, db, "UPDATE feedback SET status = 'actioned' WHERE id = 'fb_3'")
+		mustExec(t, db, "UPDATE feedback SET status = 'ignored' WHERE id = 'fb_4'")
+		tags, err := store.EnsureTags(ctx, db.SQL, d, tn.ID, []string{"Bug", "Idea", "Safari"}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bug, idea, saf := tags[0].ID, tags[1].ID, tags[2].ID
+		for _, l := range []struct {
+			ids []string
+			tag string
+		}{
+			{[]string{"fb_1", "fb_2", "fb_4"}, bug},
+			{[]string{"fb_3", "fb_4"}, idea},
+			{[]string{"fb_1"}, saf},
+		} {
+			if _, err := store.AddFeedbackTags(ctx, db.SQL, d, tn.ID, l.ids, []string{l.tag}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		otags, _ := store.EnsureTags(ctx, db.SQL, d, other.ID, []string{"Bug"}, 1)
+		store.AddFeedbackTags(ctx, db.SQL, d, other.ID, []string{"fb_o"}, []string{otags[0].ID})
+
+		type tc struct {
+			name     string
+			f        store.FeedbackFilter
+			total    int64
+			status   [4]int64 // new, reviewed, actioned, ignored
+			byTag    map[string]int64
+			byChan   map[string]int64
+			checkTag bool
+			checkCh  bool
+		}
+		cases := []tc{
+			{name: "tag", f: store.FeedbackFilter{Tag: "Bug"}, total: 3, status: [4]int64{1, 1, 0, 1},
+				byTag: map[string]int64{"Bug": 3, "Idea": 1, "Safari": 1}, checkTag: true,
+				byChan: map[string]int64{main.ID: 2, web.ID: 1}, checkCh: true},
+			{name: "tag_case_insensitive", f: store.FeedbackFilter{Tag: "bUG"}, total: 3, status: [4]int64{1, 1, 0, 1}},
+			{name: "channel", f: store.FeedbackFilter{ChannelID: web.ID}, total: 3, status: [4]int64{1, 0, 1, 1},
+				byChan: map[string]int64{web.ID: 3}, checkCh: true,
+				byTag: map[string]int64{"Idea": 2, "Bug": 1}, checkTag: true},
+			{name: "userId", f: store.FeedbackFilter{UserID: "u1"}, total: 3, status: [4]int64{1, 0, 1, 1}},
+			{name: "q", f: store.FeedbackFilter{Q: "safari"}, total: 2, status: [4]int64{1, 0, 0, 1}},
+			{name: "q_escapes_like_wildcards", f: store.FeedbackFilter{Q: "%"}, total: 1, status: [4]int64{0, 1, 0, 0}},
+			{name: "range", f: store.FeedbackFilter{From: i64(200), To: i64(400)}, total: 2, status: [4]int64{0, 1, 1, 0}},
+			{name: "combined", f: store.FeedbackFilter{Tag: "bug", ChannelID: web.ID, Q: "safari", From: i64(300), To: i64(500)},
+				total: 1, status: [4]int64{0, 0, 0, 1},
+				byChan: map[string]int64{web.ID: 1}, checkCh: true,
+				byTag: map[string]int64{"Bug": 1, "Idea": 1}, checkTag: true},
+			{name: "status_ignored", f: store.FeedbackFilter{Statuses: []string{"new"}}, total: 5, status: [4]int64{2, 1, 1, 1}},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				s, err := store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, c.f)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := map[string]int64{"new": c.status[0], "reviewed": c.status[1], "actioned": c.status[2], "ignored": c.status[3]}
+				if s.Total != c.total || !reflect.DeepEqual(s.ByStatus, want) {
+					t.Errorf("total/status = %d %v, want %d %v", s.Total, s.ByStatus, c.total, want)
+				}
+				if c.checkTag {
+					got := map[string]int64{}
+					for _, tg := range s.ByTag {
+						got[tg.Name] = tg.Count
+					}
+					if !reflect.DeepEqual(got, c.byTag) {
+						t.Errorf("byTag = %v, want %v", got, c.byTag)
+					}
+				}
+				if c.checkCh {
+					got := map[string]int64{}
+					for _, ch := range s.ByChannel {
+						got[ch.ChannelID] = ch.Count
+					}
+					if !reflect.DeepEqual(got, c.byChan) {
+						t.Errorf("byChannel = %v, want %v", got, c.byChan)
+					}
+				}
+			})
+		}
+		t.Run("tenant_scoped", func(t *testing.T) {
+			// fb_o matches u1, safari and tag Bug in the other tenant; none of
+			// it may leak into acme's counts.
+			for name, f := range map[string]store.FeedbackFilter{
+				"userId": {UserID: "u1"}, "q": {Q: "safari"}, "tag": {Tag: "Bug"},
+			} {
+				s, err := store.GetFeedbackStats(ctx, db.SQL, d, tn.ID, f)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := map[string]int64{"userId": 3, "q": 2, "tag": 3}[name]
+				if s.Total != want {
+					t.Errorf("%s: acme total = %d, want %d", name, s.Total, want)
+				}
+			}
+			s, err := store.GetFeedbackStats(ctx, db.SQL, d, other.ID, store.FeedbackFilter{Tag: "Bug"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s.Total != 1 || len(s.ByTag) != 1 || s.ByTag[0].Count != 1 || len(s.ByChannel) != 1 || s.ByChannel[0].ChannelID != och.ID {
+				t.Errorf("other tenant: %+v", s)
+			}
+		})
 	})
 }
 

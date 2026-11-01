@@ -2,6 +2,7 @@ export type ShortcutAction =
   | "next"
   | "prev"
   | "toggleSelect"
+  | "rangeSelect"
   | "open"
   | "reviewed"
   | "actioned"
@@ -9,7 +10,10 @@ export type ShortcutAction =
   | "new"
   | "clearSelection"
   | "focusSearch"
-  | "toggleHelp";
+  | "toggleHelp"
+  | "undo"
+  | "tag"
+  | "back";
 
 export interface KeyLike {
   key: string;
@@ -34,6 +38,7 @@ const MAP: Record<string, ShortcutAction> = {
   k: "prev",
   ArrowUp: "prev",
   x: "toggleSelect",
+  X: "rangeSelect",
   Enter: "open",
   e: "reviewed",
   a: "actioned",
@@ -42,6 +47,9 @@ const MAP: Record<string, ShortcutAction> = {
   Escape: "clearSelection",
   "/": "focusSearch",
   "?": "toggleHelp",
+  z: "undo",
+  t: "tag",
+  u: "back",
 };
 
 /** Map a key event to a list action. Null when the key is ignored in this context. */

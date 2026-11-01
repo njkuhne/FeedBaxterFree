@@ -81,10 +81,72 @@ func TestListValidation(t *testing.T) {
 				t.Errorf("%s: err %v", c.name, err)
 			}
 		}
-		_, err := s.Stats(ctx, f.revP, &now, &earlier)
+		_, err := s.Stats(ctx, f.revP, Filter{From: &now, To: &earlier})
 		wantKind(t, err, KindInvalid)
 		_, err = s.GetFeedback(ctx, f.revP, "fb_missing")
 		wantKind(t, err, KindNotFound)
+	})
+}
+
+func TestStatsFilters(t *testing.T) {
+	storetest.ForEachDialect(t, func(t *testing.T, db *store.DB) {
+		ctx := context.Background()
+		f := newFixture(t, db)
+		s := f.svc
+		app := f.newChannel(t, f.tenant.ID, "app")
+		base := f.ms()
+		u1, u2 := "u1", "u2"
+		rows := []store.FeedbackRow{
+			{ID: "fb_s1", TenantID: f.tenant.ID, ChannelID: f.channel.ID, Message: "Safari crash", UserID: &u1, ReceivedAt: base},
+			{ID: "fb_s2", TenantID: f.tenant.ID, ChannelID: f.channel.ID, Message: "love it", UserID: &u2, ReceivedAt: base + 1},
+			{ID: "fb_s3", TenantID: f.tenant.ID, ChannelID: app.ID, Message: "safari slow", UserID: &u1, ReceivedAt: base + 2},
+			{ID: "fb_s4", TenantID: f.tenant.ID, ChannelID: app.ID, Message: "dark mode", ReceivedAt: base + 3},
+		}
+		for i := range rows {
+			rows[i].IdempotencyKey = rows[i].ID
+		}
+		if _, err := store.InsertFeedbackBatch(ctx, db.SQL, db.Dialect, rows); err != nil {
+			t.Fatal(err)
+		}
+		_, err := s.SetStatus(ctx, f.revP, []string{"fb_s2"}, "reviewed")
+		mustNil(t, err)
+		_, err = s.AddTags(ctx, f.revP, []string{"fb_s1", "fb_s3"}, []string{"Bug"})
+		mustNil(t, err)
+
+		total := func(name string, fl Filter, want int64) store.FeedbackStats {
+			t.Helper()
+			st, err := s.Stats(ctx, f.revP, fl)
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if st.Total != want {
+				t.Errorf("%s: total = %d, want %d (%+v)", name, st.Total, want, st)
+			}
+			return st
+		}
+		total("none", Filter{}, 4)
+		st := total("tag", Filter{Tag: "bug"}, 2)
+		if st.ByStatus["new"] != 2 || len(st.ByTag) != 1 || st.ByTag[0].Count != 2 {
+			t.Errorf("tag stats %+v", st)
+		}
+		st = total("channel", Filter{ChannelID: app.ID}, 2)
+		if len(st.ByChannel) != 1 || st.ByChannel[0].ChannelID != app.ID {
+			t.Errorf("channel stats %+v", st.ByChannel)
+		}
+		total("userId", Filter{UserID: "u1"}, 2)
+		total("q", Filter{Q: "SAFARI"}, 2)
+		total("combined", Filter{Tag: "bug", ChannelID: app.ID, Q: "safari", UserID: "u1"}, 1)
+		st = total("status ignored", Filter{Statuses: []string{"reviewed"}}, 4)
+		if st.ByStatus["new"] != 3 || st.ByStatus["reviewed"] != 1 {
+			t.Errorf("status was applied: %+v", st.ByStatus)
+		}
+
+		_, err = s.Stats(ctx, f.revP, Filter{Q: strings.Repeat("x", 201)})
+		wantKind(t, err, KindInvalid)
+		now := f.clock.now()
+		earlier := now.Add(-time.Hour)
+		_, err = s.Stats(ctx, f.revP, Filter{From: &now, To: &earlier})
+		wantKind(t, err, KindInvalid)
 	})
 }
 
@@ -155,7 +217,7 @@ func TestBulkLimits(t *testing.T) {
 		if len(d.Tags) != 1 || d.Tags[0] != "Billing" {
 			t.Fatalf("tags after remove %v", d.Tags)
 		}
-		st, err := s.Stats(ctx, f.revP, nil, nil)
+		st, err := s.Stats(ctx, f.revP, Filter{})
 		mustNil(t, err)
 		if st.Total != 2 || st.ByStatus["new"] != 2 {
 			t.Fatalf("stats %+v", st)

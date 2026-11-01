@@ -225,7 +225,7 @@ Single-item routes answer `404 not_found` ("Feedback not found.") for an unknown
 
 #### List filters
 
-`GET /api/feedback`, `GET /api/feedback/export` and (for `from`/`to` only) `GET /api/stats` use these query parameters. All are optional and combine with AND.
+`GET /api/feedback`, `GET /api/feedback/export` and `GET /api/stats` use these query parameters (stats ignores `status`, `limit` and `cursor`). All are optional and combine with AND.
 
 | Parameter | Meaning |
 | --- | --- |
@@ -284,9 +284,9 @@ All three bulk routes take `ids`: 1 to 500 IDs. Empty strings and duplicates are
 
 | Method and path | Role | Success |
 | --- | --- | --- |
-| `GET /api/stats[?from=&to=]` | any signed-in | 200 |
+| `GET /api/stats[?tag=&channel=&userId=&q=&from=&to=]` | any signed-in | 200 |
 
-Only `from` and `to` are read (same meaning as above); other filters are ignored.
+Reads the same `tag`, `channel`, `userId`, `q`, `from` and `to` parameters as the list, with the same meaning and validation, combined with AND. A `status` parameter is ignored (never validated, so `status=bogus` is not a 400) because the response is the per-status counts; `limit` and `cursor` are ignored too. Every count is over the filtered set: with `tag=bug`, `byTag` lists every tag that appears on the matching items (including `bug`), and with `channel=X`, `byChannel` has at most that channel.
 
 ```json
 {

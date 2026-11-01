@@ -303,15 +303,18 @@ func (s *Service) ListTags(ctx context.Context, p ext.Principal) ([]store.Tag, e
 	return ts, err
 }
 
-// Stats counts feedback received in [from, to).
-func (s *Service) Stats(ctx context.Context, p ext.Principal, from, to *time.Time) (store.FeedbackStats, error) {
+// Stats counts the feedback matching f by status, channel and tag. Statuses
+// in f are validated like the list's but never applied.
+func (s *Service) Stats(ctx context.Context, p ext.Principal, f Filter) (store.FeedbackStats, error) {
 	if err := requireUser(p); err != nil {
 		return store.FeedbackStats{}, err
 	}
-	if err := validateRange(from, to); err != nil {
+	sf, err := f.toStore()
+	if err != nil {
 		return store.FeedbackStats{}, err
 	}
-	return store.GetFeedbackStats(ctx, s.DB.SQL, s.d(), p.TenantID, millis(from), millis(to))
+	sf.Statuses = nil
+	return store.GetFeedbackStats(ctx, s.DB.SQL, s.d(), p.TenantID, sf)
 }
 
 // DeleteFeedback deletes one item (admin only). Counters are never touched:

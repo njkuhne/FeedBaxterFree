@@ -8,69 +8,200 @@
   column-gap: var(--s-4);
 }
 
-.export-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-2);
-}
-
-.export-links .btn {
-  gap: var(--s-1);
-}
-
-/* Filters */
-.filters {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
-  margin-bottom: var(--s-4);
-}
-
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--s-3);
-}
-
-.filter-row .field {
-  width: 180px;
-}
-
-.filter-row .field:last-child {
-  flex: 1;
-  min-width: 200px;
-}
-
-/* Bulk bar */
-.bulk {
-  position: sticky;
-  top: 0;
-  z-index: 5;
+/* Toolbar: search, tag, channel and export on one line */
+.toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  column-gap: var(--s-3);
-  margin-bottom: var(--s-3);
-  padding: var(--s-1) var(--s-3);
+  gap: var(--s-2);
+  margin: var(--s-3) 0 var(--s-2);
+}
+
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 12rem;
+}
+
+.search-box .control {
+  padding-left: 36px;
+  padding-right: var(--target);
+}
+
+.search-box .control::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search-icon {
+  position: absolute;
+  top: 50%;
+  left: var(--s-3);
+  translate: 0 -50%;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+.search-clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target);
+  height: var(--target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  border-radius: var(--radius-button);
+  cursor: pointer;
+}
+
+.search-clear:hover {
+  color: var(--ink);
+}
+
+.toolbar-select {
+  width: auto;
+  max-width: 12rem;
+}
+
+.export-button {
+  gap: var(--s-1);
+}
+
+/* Disclosure panels: export and the bulk bar's tag popovers */
+.popover-wrap {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  min-width: 14rem;
+  padding: var(--s-3);
   background: var(--card-stock);
-  border: var(--border-hairline);
+  border: var(--border-kraft);
   border-radius: var(--radius-panel);
+}
+
+.popover[hidden] {
+  display: none;
+}
+
+.popover-end {
+  right: 0;
+  left: auto;
+}
+
+.popover-note {
+  margin-bottom: var(--s-2);
+  color: var(--ink-soft);
+  font-size: var(--fs-ui-sm);
+  white-space: nowrap;
+}
+
+.popover-actions {
+  display: flex;
+  gap: var(--s-3);
+}
+
+.popover-stack {
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-start;
+}
+
+.popover .tag-editor {
+  min-height: 0;
+}
+
+/* List header line: summary and chips, or the bulk bar; same height either way */
+.list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--target);
+  border-bottom: var(--border-hairline);
+}
+
+.list-summary {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: var(--fs-ui-sm);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding-left: 10px;
+  background: var(--oat);
+  color: var(--ink-soft);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-meta);
+}
+
+.filter-chip-remove {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.filter-chip-remove::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--target);
+  height: var(--target);
+  translate: -50% -50%;
+}
+
+.filter-chip-remove:hover {
+  color: var(--ink);
+}
+
+.select-notice {
+  padding: 0 var(--s-2);
+  background: var(--oat);
+  color: var(--ink-soft);
+  font-size: var(--fs-ui-sm);
+}
+
+/* Bulk bar: never wraps, never moves the line */
+.bulk {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .bulk-count {
   font-weight: var(--fw-medium);
 }
 
-.bulk-tag {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--s-2);
-  padding: var(--s-1) 0;
-}
-
-.bulk-tag .field {
-  width: 160px;
+.bulk .btn {
+  padding: 0 var(--s-1);
 }
 
 .bulk-clear {
@@ -78,10 +209,6 @@
 }
 
 /* List */
-.list-head {
-  border-bottom: var(--border-hairline);
-}
-
 .rows {
   list-style: none;
 }
@@ -101,18 +228,26 @@
   background: var(--dusk-tint);
 }
 
-.row:focus-within {
+.row-selected + .row-selected {
+  border-top: 1px solid var(--kraft);
+}
+
+.row {
+  cursor: pointer;
+}
+
+/* The current row (roving focus) keeps its bar whether or not focus is in the list. */
+.row-current {
   box-shadow: inset 3px 0 0 var(--dusk-deep);
 }
 
 .row-check {
-  position: relative;
-  z-index: 1;
   margin-top: calc(var(--s-2) * -1);
   margin-bottom: calc(var(--s-2) * -1);
 }
 
-.row > .marker {
+.row > .marker,
+.row > .marker-label {
   margin-top: 3px;
 }
 
@@ -126,19 +261,32 @@
   text-decoration: none;
 }
 
-/* The whole row is the click target, not just the preview text. */
-.row-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-}
-
 .row-preview {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   font-size: var(--fs-preview);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Search matches: the underline is the cue that does not rely on colour */
+.hl {
+  background: var(--oat);
+  color: inherit;
+  border-bottom: 1px solid var(--bark);
+}
+
+.row-selected .hl {
+  background: var(--card-stock);
+}
+
+/* The previous results stay while a new query loads */
+.rows[aria-busy="true"] {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .row-link:hover .row-preview {
@@ -164,7 +312,22 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-1);
+}
+
+.row-tags-after {
   margin-left: var(--s-2);
+}
+
+.row-selected .pill {
+  background: var(--card-stock);
+}
+
+.row-selected .marker-new {
+  color: var(--dusk-deep);
+}
+
+.marker-label {
+  display: inline-flex;
 }
 
 .row-time {
@@ -224,6 +387,27 @@ kbd {
   margin-left: calc(var(--s-1) * -1);
 }
 
+.detail-nav {
+  margin-bottom: var(--s-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-1) var(--s-4);
+}
+
+.detail-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.detail-position {
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+}
+
 .detail-meta {
   display: flex;
   flex-wrap: wrap;
@@ -251,31 +435,89 @@ kbd {
   white-space: pre-line;
 }
 
+/* Four fixed slots, so swapping the primary never moves anything. */
 .status-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 9.5rem);
   align-items: center;
-  gap: var(--s-2) var(--s-4);
+  gap: var(--s-2);
   margin-bottom: var(--s-8);
 }
 
-.tag-list {
+.status-actions .btn {
+  width: 100%;
+}
+
+@media (max-width: 559px) {
+  .status-actions {
+    grid-template-columns: repeat(2, 9.5rem);
+  }
+}
+
+/* Tag editor: pills, then "+ Add tag" or the add field. Pill gap 12 px so 44 px hit areas do not overlap. */
+.tag-editor {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
-  margin-bottom: var(--s-3);
+  gap: var(--s-1) var(--s-3);
+  min-height: var(--target);
 }
 
-.tag-form {
+.tag-add {
+  padding: 0 var(--s-1);
+}
+
+.tag-combo {
+  position: relative;
+  width: 14rem;
+}
+
+.tag-input .control {
+  height: 36px;
+}
+
+.tag-options {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: var(--s-1) 0;
+  list-style: none;
+  background: var(--card-stock);
+  border: var(--border-kraft);
+  border-radius: var(--radius-panel);
+}
+
+.tag-options[hidden] {
+  display: none;
+}
+
+.tag-option {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--s-2);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 36px;
+  padding: 0 var(--s-3);
+  color: var(--ink);
+  font-size: var(--fs-ui);
+  cursor: pointer;
 }
 
-.tag-form .field {
-  width: 220px;
+.tag-option:hover,
+.tag-option-active {
+  background: var(--oat);
+}
+
+.tag-option-active {
+  box-shadow: inset 3px 0 0 var(--dusk-deep);
+}
+
+.tag-option-count {
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
 }
 
 .history {

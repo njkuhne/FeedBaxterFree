@@ -88,5 +88,16 @@ export function exportUrl(filters: Filters, format: "csv" | "json"): string {
 
 // Tags, stats, ops
 export const listTags = () => request<Items<TagCount>>("GET", "/api/tags");
-export const stats = () => request<Stats>("GET", "/api/stats");
+/** Counts. The tag, channel, user and search filters are sent when set; the status filter never is. */
+export function stats(filters?: Filters) {
+  const params = new URLSearchParams();
+  if (filters) {
+    if (filters.tag !== "") params.set("tag", filters.tag);
+    if (filters.channel !== "") params.set("channel", filters.channel);
+    if (filters.userId !== "") params.set("userId", filters.userId);
+    if (filters.q.trim() !== "") params.set("q", filters.q.trim());
+  }
+  const qs = params.toString();
+  return request<Stats>("GET", qs ? `/api/stats?${qs}` : "/api/stats");
+}
 export const ops = () => request<Ops>("GET", "/api/ops");
