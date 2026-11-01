@@ -11,7 +11,7 @@ const channels = [
 ];
 const tags = [{ id: "t1", name: "bug", count: 12 }];
 
-function setup(over: { filters?: Filters; search?: string; count?: number | null; onSearch?: (q: string) => void; onClearSearch?: () => void } = {}) {
+function setup(over: { narrow?: boolean; filters?: Filters; search?: string; count?: number | null; onSearch?: (q: string) => void; onClearSearch?: () => void } = {}) {
   const searchRef = createRef<HTMLInputElement>();
   const utils = render(
     <Toolbar
@@ -26,6 +26,7 @@ function setup(over: { filters?: Filters; search?: string; count?: number | null
       onClearSearch={over.onClearSearch ?? (() => undefined)}
       onTag={() => undefined}
       onChannel={() => undefined}
+      {...(over.narrow ? { narrow: true } : {})}
     />,
   );
   return { ...utils, searchRef };
@@ -81,5 +82,59 @@ describe("Toolbar", () => {
     setup({ count: null, filters: { ...base, status: "all", channel: "ch_2" } });
     fireEvent.click(screen.getByRole("button", { name: "Export" }));
     expect(screen.getByText("Export all matching items · channel iOS app")).toBeTruthy();
+  });
+
+  it("narrow toolbar shows search and a Filters button, not the selects", () => {
+    setup({ narrow: true });
+    expect(screen.getByLabelText("Search")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Filters" })).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Export" })).toBeNull();
+    expect((document.querySelector(".filters-panel") as HTMLElement).hidden).toBe(true);
+  });
+
+  it("Filters button shows the active count", () => {
+    setup({ narrow: true, filters: { ...base, tag: "bug", channel: "ch_2", q: "safari" } });
+    expect(screen.getByRole("button", { name: "Filters \u00b7 2" })).toBeTruthy();
+  });
+
+  it("Filters button toggles the disclosure with aria-expanded", () => {
+    setup({ narrow: true });
+    const button = screen.getByRole("button", { name: "Filters" });
+    const panel = document.querySelector(".filters-panel") as HTMLElement;
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(button.getAttribute("aria-controls")).toBe(panel.id);
+    fireEvent.click(button);
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(panel.hidden).toBe(false);
+    fireEvent.keyDown(screen.getByLabelText("Tag"), { key: "Escape" });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(button);
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(panel.hidden).toBe(true);
+  });
+
+  it("the disclosure holds Tag, Channel and Export", () => {
+    setup({ narrow: true, filters: { ...base, tag: "bug" }, count: 17 });
+    fireEvent.click(screen.getByRole("button", { name: "Filters \u00b7 1" }));
+    const panel = document.querySelector(".filters-panel") as HTMLElement;
+    for (const label of ["Tag", "Channel"]) {
+      const el = screen.getByLabelText(label);
+      expect(panel.contains(el)).toBe(true);
+      const l = Array.from(panel.querySelectorAll("label")).find((x) => x.textContent === label);
+      expect(l?.className).toBe("field-label");
+    }
+    expect(panel.textContent).toContain("Export 17 items \u00b7 New, tag bug");
+    expect(screen.getByRole("link", { name: "CSV" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "JSON" })).toBeTruthy();
+  });
+
+  it("desktop toolbar is unchanged", () => {
+    setup();
+    expect(screen.getByLabelText("Tag")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Filters/ })).toBeNull();
+    expect(document.querySelector(".filters-panel")).toBeNull();
   });
 });

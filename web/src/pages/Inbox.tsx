@@ -9,6 +9,7 @@ import { useToast } from "../components/Toast";
 import { errorMessage } from "../lib/api";
 import { listChannels, listFeedback, listTags, stats as fetchStats } from "../lib/endpoints";
 import { defaultFilters, filtersFromQuery, filtersToQuery } from "../lib/filters";
+import { useNarrow } from "../lib/useMediaQuery";
 import type { Channel, Filters, Stats, Status, TagCount } from "../lib/types";
 import { emptyCopy } from "../feedback/emptyCopy";
 import { FeedbackList } from "../feedback/FeedbackList";
@@ -64,6 +65,7 @@ export default function Inbox() {
   const [params, setParams] = useSearchParams();
   const filters = useMemo(() => filtersFromQuery(params), [params]);
   const toast = useToast();
+  const narrow = useNarrow();
   const [boot, setBoot] = useState<Boot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState(filters.q);
@@ -224,6 +226,7 @@ export default function Inbox() {
         onClearSearch={clearSearch}
         onTag={(tag) => push({ ...filters, tag })}
         onChannel={(channel) => push({ ...filters, channel })}
+        narrow={narrow}
       />
       <FeedbackList
         filters={filters}

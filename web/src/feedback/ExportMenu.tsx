@@ -62,6 +62,27 @@ interface ExportMenuProps {
   channelName?: string;
 }
 
+interface ExportPanelProps extends ExportMenuProps {
+  /** Called after a download link is used (the popover closes itself). */
+  onDone?: () => void;
+}
+
+/** What will be exported, and the CSV and JSON links. The popover and the narrow filters panel both show it. */
+export function ExportPanel({ filters, count, channelName, onDone }: ExportPanelProps) {
+  return (
+    <>
+      <p className="popover-note">{exportDescription(filters, count, channelName)}</p>
+      <div className="popover-actions">
+        {(["csv", "json"] as const).map((format) => (
+          <a key={format} className="btn btn-text" href={exportUrl(filters, format)} download onClick={() => onDone?.()}>
+            {format.toUpperCase()}
+          </a>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function ExportMenu({ filters, count, channelName }: ExportMenuProps) {
   const pop = usePopover();
   return (
@@ -79,20 +100,7 @@ export function ExportMenu({ filters, count, channelName }: ExportMenuProps) {
         <ChevronDownIcon />
       </Button>
       <div id={pop.panelId} className="popover popover-end" hidden={!pop.open}>
-        <p className="popover-note">{exportDescription(filters, count, channelName)}</p>
-        <div className="popover-actions">
-          {(["csv", "json"] as const).map((format) => (
-            <a
-              key={format}
-              className="btn btn-text"
-              href={exportUrl(filters, format)}
-              download
-              onClick={() => pop.close()}
-            >
-              {format.toUpperCase()}
-            </a>
-          ))}
-        </div>
+        <ExportPanel filters={filters} count={count} onDone={() => pop.close()} {...(channelName === undefined ? {} : { channelName })} />
       </div>
     </div>
   );

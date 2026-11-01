@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "../components/Button";
 import { Checkbox } from "../components/Checkbox";
 import { XIcon } from "../components/icons";
@@ -40,6 +41,10 @@ interface ListHeaderProps {
   onAddTag: (tag: string) => Promise<boolean>;
   onRemoveTag: (tag: string) => void;
   onClear: () => void;
+  /** Below 880 px the checkboxes and bulk bar live behind a Select button. */
+  narrow?: boolean;
+  selectMode?: boolean;
+  onSelectMode?: (on: boolean) => void;
 }
 
 /**
@@ -66,19 +71,36 @@ export function ListHeader({
   onAddTag,
   onRemoveTag,
   onClear,
+  narrow = false,
+  selectMode = false,
+  onSelectMode,
 }: ListHeaderProps) {
   const selecting = selectedCount > 0;
+  const selectRef = useRef<HTMLButtonElement | null>(null);
+  const leaving = useRef(false);
+  // After Done, focus goes to the Select button that takes its place.
+  useEffect(() => {
+    if (!selectMode && leaving.current) {
+      leaving.current = false;
+      selectRef.current?.focus();
+    }
+  }, [selectMode]);
+  // On narrow screens the checkbox and the bulk bar exist only in Select mode.
+  const checks = !narrow || selectMode;
+  const bulk = selecting && checks;
   return (
     <>
-      <div className="list-head">
-        <Checkbox
-          label="Select all on this page"
-          hideLabel
-          checked={allSelected}
-          indeterminate={selecting && !allSelected}
-          onChange={onToggleAll}
-        />
-        {selecting ? (
+      <div className={narrow && bulk ? "list-head list-head-bulk" : "list-head"}>
+        {checks ? (
+          <Checkbox
+            label="Select all on this page"
+            hideLabel
+            checked={allSelected}
+            indeterminate={selecting && !allSelected}
+            onChange={onToggleAll}
+          />
+        ) : null}
+        {bulk ? (
           <BulkBar
             count={selectedCount}
             busy={busy}
@@ -91,7 +113,10 @@ export function ListHeader({
             onAddTag={onAddTag}
             onRemoveTag={onRemoveTag}
             onClear={onClear}
+            hideClear={narrow}
           />
+        ) : narrow && selectMode ? (
+          <span className="list-hint">Select items</span>
         ) : (
           <div className="list-summary">
             <span className="list-count">{pending ?? (total === null ? `${loaded} loaded` : plural(total, "item", "items"))}</span>
@@ -110,6 +135,23 @@ export function ListHeader({
             ) : null}
           </div>
         )}
+        {narrow && !selectMode ? (
+          <Button variant="text" ref={selectRef} className="list-select" onClick={() => onSelectMode?.(true)}>
+            Select
+          </Button>
+        ) : null}
+        {narrow && selectMode ? (
+          <Button
+            variant="text"
+            className="list-select"
+            onClick={() => {
+              leaving.current = true;
+              onSelectMode?.(false);
+            }}
+          >
+            Done
+          </Button>
+        ) : null}
       </div>
       {notice !== null ? (
         <p className="select-notice">

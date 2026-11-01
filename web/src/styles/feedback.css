@@ -28,6 +28,11 @@
   padding-right: var(--target);
 }
 
+/* The clear button only exists with text, so an empty box gives its room back to the placeholder. */
+.search-box .control:placeholder-shown {
+  padding-right: var(--s-3);
+}
+
 .search-box .control::-webkit-search-cancel-button {
   appearance: none;
 }
@@ -293,14 +298,15 @@
   text-decoration: underline;
 }
 
-.row-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+.meta-list.row-meta {
+  --meta-gap: var(--s-3);
   margin-top: var(--s-1);
   font-size: var(--fs-meta);
   color: var(--ink-muted);
-  white-space: pre-wrap;
+}
+
+.row-selected .meta-list > * + *::before {
+  color: var(--ink-soft);
 }
 
 .row-selected .row-meta {
@@ -312,10 +318,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-1);
-}
-
-.row-tags-after {
-  margin-left: var(--s-2);
 }
 
 .row-selected .pill {
@@ -408,11 +410,7 @@ kbd {
   font-size: var(--fs-meta);
 }
 
-.detail-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-1) var(--s-2);
+.meta-list.detail-meta {
   color: var(--ink-soft);
   font-size: var(--fs-ui-sm);
 }
@@ -526,6 +524,10 @@ kbd {
   gap: var(--s-1);
 }
 
+.history li {
+  overflow-wrap: anywhere;
+}
+
 .detail-footer {
   display: flex;
   flex-direction: column;
@@ -573,13 +575,177 @@ kbd {
   margin-top: var(--s-2);
 }
 
+/* Narrow screens (below 880 px) */
+.btn.filters-button {
+  flex: none;
+  gap: var(--s-1);
+  padding: 0 var(--s-2);
+  white-space: nowrap;
+}
+
+.filters-panel {
+  display: flex;
+  flex: 0 0 100%;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  background: var(--card-stock);
+  border: var(--border-hairline);
+  border-radius: var(--radius-panel);
+}
+
+.filters-panel[hidden] {
+  display: none;
+}
+
+.filters-panel .toolbar-select {
+  width: 100%;
+  max-width: none;
+}
+
+.filters-label {
+  color: var(--ink-muted);
+  font-size: var(--fs-label);
+}
+
+.filters-panel .popover-note {
+  margin-bottom: var(--s-1);
+}
+
+.list-hint {
+  flex: 1;
+  color: var(--ink-soft);
+  font-size: var(--fs-ui-sm);
+}
+
+.list-select {
+  margin-left: auto;
+}
+
+.row-narrow {
+  grid-template-columns: 16px minmax(0, 1fr);
+  min-height: var(--target);
+}
+
+.row-narrow:not(.row-has-check) {
+  padding-left: var(--s-3);
+}
+
+.row-narrow.row-has-check {
+  grid-template-columns: var(--target) 16px minmax(0, 1fr);
+}
+
+.row-narrow .row-time {
+  text-align: left;
+}
+
+/* The sticky status bar: the one set of status buttons on the narrow detail page. */
+.status-actions.status-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 15;
+  grid-template-columns: 1fr 1fr auto;
+  margin: 0;
+  padding: var(--s-2) max(var(--s-4), env(safe-area-inset-right)) calc(var(--s-2) + env(safe-area-inset-bottom))
+    max(var(--s-4), env(safe-area-inset-left));
+  background: var(--card-stock);
+  border-top: var(--border-kraft);
+}
+
+.status-bar-solo.status-actions.status-bar {
+  grid-template-columns: 1fr 1fr;
+}
+
+.status-bar .btn {
+  min-width: 0;
+  padding: 0 var(--s-2);
+  font-size: var(--fs-ui-sm);
+  white-space: nowrap;
+}
+
+.status-bar .status-next {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  align-self: stretch;
+  min-width: var(--target);
+}
+
+.detail-has-bar {
+  padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom) + var(--s-6));
+}
+
+html:has(.status-bar) {
+  scroll-padding-bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
+}
+
 @media (max-width: 879px) {
-  .row {
-    grid-template-columns: var(--target) 16px minmax(0, 1fr);
+  .search-box {
+    min-width: 0;
   }
 
-  .row-time {
-    grid-column: 3;
-    text-align: left;
+  .popover {
+    max-width: calc(100vw - 2 * var(--s-4));
+  }
+
+  .popover-note {
+    white-space: normal;
+  }
+
+  .list-head {
+    position: relative;
+    flex-wrap: wrap;
+  }
+
+  /* While the bulk bar shows, the checkbox and Done stay on the first 44 px line. */
+  .list-head-bulk {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+
+  .list-head-bulk .bulk {
+    flex: 1;
+    min-width: 0;
+    column-gap: var(--s-3);
+  }
+
+  /* The count sits on the same 44 px line as the checkbox and Done. */
+  .list-head-bulk .bulk-count {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--target);
+  }
+
+  .list-head .popover-wrap,
+  .page-head .popover-wrap {
+    position: static;
+  }
+
+  .page-head {
+    position: relative;
+  }
+
+  .page-head .popover {
+    right: 0;
+    left: 0;
+    max-width: none;
+  }
+
+  .list-head .popover {
+    right: 0;
+    left: 0;
+    max-width: none;
+  }
+
+  .bulk {
+    flex-wrap: wrap;
+    row-gap: var(--s-1);
+    white-space: normal;
+  }
+
+  .bulk .btn {
+    min-width: var(--target);
+    padding: 0 var(--s-2);
   }
 }

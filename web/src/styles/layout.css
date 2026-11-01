@@ -127,6 +127,7 @@
   font-size: var(--fs-title);
   line-height: 1.2;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 /* Login and forced password change */
@@ -165,45 +166,97 @@
   padding: var(--s-16) var(--s-4);
 }
 
-/* Narrow screens: the rail becomes a top bar */
+/* Compact top bar (below 880 px; the rail is not rendered then) */
+.topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  min-height: 56px;
+  padding: 0 var(--s-4);
+  background: var(--paper);
+  border-bottom: var(--border-hairline);
+}
+
+.btn.topbar-menu {
+  gap: var(--s-1);
+  min-width: var(--target);
+  padding: 0 var(--s-2);
+}
+
+.topbar-chevron-open {
+  rotate: 180deg;
+}
+
+.topbar-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: var(--s-2) var(--s-4) var(--s-4);
+  background: var(--card-stock);
+  border-bottom: var(--border-kraft);
+}
+
+.topbar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.topbar-account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+  min-width: 0;
+  margin-top: var(--s-3);
+  padding: var(--s-3) var(--s-3) 0;
+  border-top: var(--border-hairline);
+}
+
+.topbar-email {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .topbar-chevron {
+    transition: rotate 150ms ease;
+  }
+
+  .topbar-panel:not([hidden]) {
+    animation: panel-in 150ms ease;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
 @media (max-width: 879px) {
   .shell {
     flex-direction: column;
   }
 
-  .rail {
-    position: static;
-    flex-flow: row wrap;
-    align-items: center;
-    width: auto;
-    height: auto;
-    gap: var(--s-1) var(--s-4);
-    padding: var(--s-2) var(--s-4);
-    border-right: 0;
-    border-bottom: var(--border-hairline);
-  }
-
-  .rail-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    margin-top: 0;
-  }
-
-  .rail-account {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-2) var(--s-3);
-    margin-top: 0;
-    margin-left: auto;
-    padding: 0;
-  }
-
-  .rail-email {
-    max-width: 14em;
-  }
-
   .content {
-    padding: var(--s-6) var(--s-4);
+    padding: var(--s-4);
+  }
+
+  .page-title {
+    margin-bottom: var(--s-4);
   }
 }

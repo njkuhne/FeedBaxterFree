@@ -7,6 +7,7 @@ import { useToast } from "../components/Toast";
 import { errorMessage } from "../lib/api";
 import { addTags, bulkStatus, removeTags, setStatus } from "../lib/endpoints";
 import { matchesFilters } from "../lib/filters";
+import { useNarrow } from "../lib/useMediaQuery";
 import { shortcutFor, type KeyLike, type ShortcutAction } from "../lib/shortcuts";
 import type { Feedback, Filters, Status, TagCount } from "../lib/types";
 import "../styles/feedback.css";
@@ -111,6 +112,11 @@ export function FeedbackList({
   const [helpOpen, setHelpOpen] = useState(false);
   // A "t" press asks the bulk bar to open its tag popover; the popover clears the request.
   const [tagOpen, setTagOpen] = useState(false);
+  const narrow = useNarrow();
+  // Narrow screens show the row checkboxes and the bulk bar only in Select mode.
+  const [selectMode, setSelectMode] = useState(false);
+  const [checkReq, setCheckReq] = useState(false);
+  const showChecks = !narrow || selectMode;
   const [seenKey, setSeenKey] = useState(key);
   const stale = list.stale;
   // The list stays mounted when the query changes, so what used to reset by remounting resets here:
@@ -122,6 +128,7 @@ export function FeedbackList({
     setMatching(null);
     setSelectingAll(false);
     setTagOpen(false);
+    setSelectMode(false);
   }
   const [focusReq, setFocusReq] = useState<{ id: string | null } | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
@@ -164,6 +171,13 @@ export function FeedbackList({
     }
     setFocusReq(null);
   }, [focusReq]);
+
+  // "Select" moves focus to the first row's checkbox once it exists.
+  useEffect(() => {
+    if (!checkReq || !showChecks) return;
+    listRef.current?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus();
+    setCheckReq(false);
+  }, [checkReq, showChecks]);
 
   // Back from a detail page: put focus on the row that was opened, after the page's own h1 focus.
   // Runs on mount and whenever the query changes (the list no longer remounts per query), but never
@@ -219,6 +233,18 @@ export function FeedbackList({
   const changeSelection = (next: ReadonlySet<string>) => {
     setMatching(null);
     setSelected(next);
+    // A selection on a narrow screen (an x press, a checkbox) is Select mode.
+    if (narrow && next.size > 0) setSelectMode(true);
+  };
+
+  const onSelectMode = (on: boolean) => {
+    if (on) {
+      setSelectMode(true);
+      setCheckReq(true);
+    } else {
+      changeSelection(new Set());
+      setSelectMode(false);
+    }
   };
 
   const moveBy = (delta: number) => {
@@ -410,6 +436,10 @@ export function FeedbackList({
         return;
       case "clearSelection":
         if (selected.size > 0) changeSelection(new Set());
+        if (narrow && selectMode) {
+          setSelectMode(false);
+          if (currentId !== null) focusRow(currentId);
+        }
         return;
       case "reviewed":
       case "actioned":
@@ -448,7 +478,7 @@ export function FeedbackList({
     }
     if (action === "next" && e.key === "ArrowDown") e.preventDefault();
     if (action === "prev" && e.key === "ArrowUp") e.preventDefault();
-    if (action === "clearSelection" && selected.size > 0) e.preventDefault();
+    if (action === "clearSelection" && (selected.size > 0 || (narrow && selectMode))) e.preventDefault();
     if (action === "tag") e.preventDefault();
     if (queue.offer(action)) return;
     runAction(action);
@@ -503,7 +533,7 @@ export function FeedbackList({
         : `All ${matching.items.length} matching are selected.`,
       onClear: () => changeSelection(new Set()),
     };
-  } else if (allSelected && list.nextCursor !== null) {
+  } else if (!narrow && allSelected && list.nextCursor !== null) {
     notice = {
       kind: "offer",
       loaded: items.length,
@@ -557,6 +587,9 @@ export function FeedbackList({
             onAddTag={addTag}
             onRemoveTag={(t) => void removeTag(t)}
             onClear={() => changeSelection(new Set())}
+            narrow={narrow}
+            selectMode={selectMode}
+            onSelectMode={onSelectMode}
           />
           <ul className="rows" aria-label="Feedback" ref={listRef} {...(stale ? { "aria-busy": true } : {})}>
             {items.map((item) => (
@@ -572,6 +605,8 @@ export function FeedbackList({
                 from={from}
                 onToggle={(range) => toggle(item.id, range)}
                 onCurrent={() => markCurrent(item.id)}
+                narrow={narrow}
+                showCheck={showChecks}
               />
             ))}
           </ul>

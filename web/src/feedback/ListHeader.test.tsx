@@ -109,4 +109,17 @@ describe("ListHeader", () => {
     render(<ListHeader {...props({ selectedCount: 1, selectedItems: [fb({ id: "a" })] })} />);
     expect(screen.queryByRole("button", { name: "Remove tag…" })).toBeNull();
   });
+
+  it("narrow header offers Select, then the checkbox and Done in Select mode", () => {
+    const onSelectMode = vi.fn();
+    const { rerender } = render(<ListHeader {...props({ narrow: true, selectMode: false, onSelectMode })} />);
+    expect(screen.queryByLabelText("Select all on this page")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    expect(onSelectMode).toHaveBeenCalledWith(true);
+    rerender(<ListHeader {...props({ narrow: true, selectMode: true, onSelectMode })} />);
+    expect(screen.getByLabelText("Select all on this page")).toBeTruthy();
+    expect(screen.getByText("Select items")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onSelectMode).toHaveBeenLastCalledWith(false);
+  });
 });

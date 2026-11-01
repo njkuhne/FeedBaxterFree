@@ -38,3 +38,5 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 - The Undo toast lasts 6 s and `z` works only while it is visible. Revisit the duration after real use.
 - Tag and Channel menu counts are totals (from `/api/tags` and the first unfiltered stats load), not counts under the other active filters.
 - Export still has no error path in the UI (phase 3 item 12).
+- The phase 2 mobile shell was checked in an emulated 375 px and 320 px Chromium viewport only. Check it on a real iPhone in Safari (safe-area insets under the sticky status bar, `viewport-fit=cover`, the hidden scrollbar on the status tabs) before calling mobile done.
+- Below 880 px a tap outside the open Menu closes it and also reaches whatever is under the tap (the panel is a non-modal disclosure, not a dialog). Revisit if people report opening an item by accident.
