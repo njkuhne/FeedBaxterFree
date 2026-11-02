@@ -33,10 +33,11 @@ Deferred items raised during milestone reviews. Not bugs in shipped behaviour; e
 
 ## UX phase 3
 
-- Auto-advance toggle on the detail page. Phase 1 advances by default after a decision that takes the item out of the list it was opened from, with Undo as the safety net. A switch belongs in the phase 3 shortcuts dialog.
-- Single-key shortcuts have no off switch (WCAG 2.1.4); phase 1 added `z`, `u`, `t` and Shift+`x`. Put the switch in the same shortcuts dialog.
 - The Undo toast lasts 6 s and `z` works only while it is visible. Revisit the duration after real use.
 - Tag and Channel menu counts are totals (from `/api/tags` and the first unfiltered stats load), not counts under the other active filters.
-- Export still has no error path in the UI (phase 3 item 12).
 - The phase 2 mobile shell was checked in an emulated 375 px and 320 px Chromium viewport only. Check it on a real iPhone in Safari (safe-area insets under the sticky status bar, `viewport-fit=cover`, the hidden scrollbar on the status tabs) before calling mobile done.
 - Below 880 px a tap outside the open Menu closes it and also reaches whatever is under the tap (the panel is a non-modal disclosure, not a dialog). Revisit if people report opening an item by accident.
+- With single-key shortcuts off, `?` still opens the shortcuts dialog (by decision, so the switch stays reachable from the keyboard). Strictly, WCAG 2.1.4 covers `?` too; the rail button is the alternative if an audit objects.
+- The per-user page can fetch the user's first page twice on the All tab (the summary line asks for it when the list store has not reported it yet, because `useFeedbackList` stores pages without an event). Harmless; make the store emit if it matters.
+- The inbox polls `/api/stats` twice every 30 s (the filtered counts for the pill, the unfiltered New count for the rail and title). Merge when no filter is active if it ever matters.
+- Ingest key "last used" is written by the processor at most once a minute per key and only for stored feedback; a key whose submissions are all rejected at ingest (caps, bad body) shows its last stored use.

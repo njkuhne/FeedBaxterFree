@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackList } from "../feedback/FeedbackList";
 import { clearFeedbackCache, listKey, setList } from "../feedback/listStore";
 import type { FromList } from "../feedback/origin";
-import { fb, mockApi, renderRoutes, type Call } from "../feedback/testHelpers";
+import { fb, labelOf, mockApi, renderRoutes, type Call } from "../feedback/testHelpers";
 import { filtersFromQuery } from "../lib/filters";
 import type { Feedback, Filters, Status } from "../lib/types";
 import FeedbackDetail from "./FeedbackDetail";
@@ -208,7 +208,29 @@ describe("FeedbackDetail navigation", () => {
     expect(calls.find((c) => c.path === "/api/feedback/status")?.body).toEqual({ ids: ["fb_2"], status: "new" });
     await waitFor(() => expect(position()).toBe("2 of 3 in New"));
     expect(srv.statusOf("fb_2")).toBe("new");
-    expect(document.querySelector(".status-actions button:disabled")?.textContent).toBe("Mark new");
+    expect(labelOf(document.querySelector(".status-actions button:disabled"))).toBe("Mark new");
+  });
+
+  it("with advance off, a decision stays on the item", async () => {
+    window.localStorage.setItem("fbx.pref.advance", "0");
+    const srv = server(rows());
+    const { calls } = mockApi(srv.handler);
+    const from = openOn(rows());
+    renderRoutes([{ pathname: "/" }, { pathname: "/feedback/fb_2", state: { from } }], pages);
+    await screen.findByText("Message fb_2");
+    fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
+    await screen.findByText("Marked 1 reviewed");
+    expect(calls.find((c) => c.method === "PATCH")?.path).toBe("/api/feedback/fb_2");
+    // Still on fb_2, refetched with its new status; Undo is offered.
+    await waitFor(() => expect(labelOf(document.querySelector(".status-actions button:disabled"))).toBe("Mark reviewed"));
+    expect(screen.getByText("Message fb_2")).toBeTruthy();
+    expect(screen.queryByText("Message fb_1")).toBeNull();
+    expect(calls.filter((c) => c.method === "GET" && c.path === "/api/feedback/fb_2").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole("button", { name: "Undo" })).toBeTruthy();
+    // Undo restores in place and does not navigate.
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(srv.statusOf("fb_2")).toBe("new"));
+    expect(screen.getByText("Message fb_2")).toBeTruthy();
   });
 
   it("at the end of the list a decision returns to the list", async () => {

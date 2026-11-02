@@ -9,7 +9,7 @@ const key = (k: string, extra: Partial<KeyLike> = {}): KeyLike => ({
   target: { tagName: "BODY" },
   ...extra,
 });
-const open: ShortcutContext = { dialogOpen: false };
+const open: ShortcutContext = { dialogOpen: false, singleKeys: true };
 
 describe("shortcutFor", () => {
   it("maps keys to actions", () => {
@@ -37,7 +37,7 @@ describe("shortcutFor", () => {
     expect(shortcutFor(key("u"), open)).toBe("back");
     expect(shortcutFor(key("z", { target: { tagName: "INPUT", type: "text" } }), open)).toBeNull();
     expect(shortcutFor(key("z", { metaKey: true }), open)).toBeNull();
-    expect(shortcutFor(key("z"), { dialogOpen: true })).toBeNull();
+    expect(shortcutFor(key("z"), { dialogOpen: true, singleKeys: true })).toBeNull();
   });
 
   it("returns null for other keys", () => {
@@ -67,7 +67,7 @@ describe("shortcutFor", () => {
   });
 
   it("is ignored while a dialog is open", () => {
-    expect(shortcutFor(key("j"), { dialogOpen: true })).toBeNull();
+    expect(shortcutFor(key("j"), { dialogOpen: true, singleKeys: true })).toBeNull();
   });
 
   it("leaves Enter to links and buttons", () => {
@@ -78,5 +78,32 @@ describe("shortcutFor", () => {
   it("maps t to tag", () => {
     expect(shortcutFor(key("t"), open)).toBe("tag");
     expect(shortcutFor(key("t", { target: { tagName: "INPUT", type: "text" } }), open)).toBeNull();
+  });
+
+  it("r marks reviewed like e", () => {
+    expect(shortcutFor(key("r"), open)).toBe("reviewed");
+    expect(shortcutFor(key("e"), open)).toBe("reviewed");
+  });
+
+  it("Shift+j and Shift+k extend the selection", () => {
+    expect(shortcutFor(key("J"), open)).toBe("extendNext");
+    expect(shortcutFor(key("K"), open)).toBe("extendPrev");
+    expect(shortcutFor(key("J", { target: { tagName: "INPUT", type: "text" } }), open)).toBeNull();
+  });
+
+  it("with single keys off, letters and slash do nothing", () => {
+    const off: ShortcutContext = { dialogOpen: false, singleKeys: false };
+    for (const k of ["j", "k", "x", "X", "J", "K", "e", "r", "a", "i", "n", "t", "u", "z", "/"]) {
+      expect(shortcutFor(key(k), off)).toBeNull();
+    }
+  });
+
+  it("with single keys off, arrows, Enter, Escape and ? still work", () => {
+    const off: ShortcutContext = { dialogOpen: false, singleKeys: false };
+    expect(shortcutFor(key("ArrowDown"), off)).toBe("next");
+    expect(shortcutFor(key("ArrowUp"), off)).toBe("prev");
+    expect(shortcutFor(key("Enter"), off)).toBe("open");
+    expect(shortcutFor(key("Escape"), off)).toBe("clearSelection");
+    expect(shortcutFor(key("?"), off)).toBe("toggleHelp");
   });
 });

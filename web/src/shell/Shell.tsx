@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { loginUrl } from "../lib/next";
 import { useNarrow } from "../lib/useMediaQuery";
+import { NewCountProvider } from "./NewCount";
 import { Rail } from "./Rail";
 import { TopBar } from "./TopBar";
 import { useAuth } from "./AuthProvider";
@@ -22,7 +23,7 @@ export function RequireAuth() {
 function Shell() {
   const narrow = useNarrow();
   return (
-    <>
+    <NewCountProvider>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -32,7 +33,7 @@ function Shell() {
           <Outlet />
         </main>
       </div>
-    </>
+    </NewCountProvider>
   );
 }
 

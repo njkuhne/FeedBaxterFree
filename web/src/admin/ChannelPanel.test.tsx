@@ -15,11 +15,12 @@ const key = (id: string, revokedAt: string | null): Key => ({
   revokedAt,
 });
 
-function setup(keys: Key[], channelCount = 2, onKeyCreated = vi.fn()) {
+function setup(keys: Key[], channelCount = 2, onKeyCreated = vi.fn(), ch: Channel = channel, itemCount: number | null = null) {
   render(
     <div id="app-root">
       <ChannelPanel
-        channel={channel}
+        channel={ch}
+        itemCount={itemCount}
         keys={keys}
         channelCount={channelCount}
         onRenamed={vi.fn()}
@@ -77,5 +78,37 @@ describe("ChannelPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.queryByLabelText("Secret value")).toBeNull();
     expect(screen.queryByText("fbx_supersecret")).toBeNull();
+  });
+
+  it("shows the item count and last received time", () => {
+    const recent = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    setup([], 2, vi.fn(), { ...channel, lastReceivedAt: recent }, 312);
+    expect(screen.getByText("312 items · last received 2 h ago")).toBeTruthy();
+    expect(screen.getByText("created 1 Mar 2026")).toBeTruthy();
+  });
+
+  it("shows No feedback yet for an empty channel", () => {
+    setup([], 2, vi.fn(), { ...channel, lastReceivedAt: null }, 0);
+    expect(screen.getByText("No feedback yet")).toBeTruthy();
+  });
+
+  it("key table shows last used or Never", () => {
+    const used = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    setup([{ ...key("a1", null), lastUsedAt: used }, key("a2", null)]);
+    expect(screen.getByRole("columnheader", { name: "Last used" })).toBeTruthy();
+    const cell = screen.getByText("5 min ago");
+    expect(cell.getAttribute("title")).toMatch(/^\d+ \w{3} \d{4}, \d{2}:\d{2}$/);
+    expect(screen.getByText("Never")).toBeTruthy();
+  });
+
+  it("Delete channel is separate from Rename", () => {
+    setup([key("a1", null)]);
+    const del = screen.getByRole("button", { name: "Delete channel" });
+    const rename = screen.getByRole("button", { name: "Rename" });
+    expect(del.closest(".channel-danger")).not.toBeNull();
+    expect(del.closest(".channel-head")).toBeNull();
+    expect(rename.closest(".channel-head")).not.toBeNull();
+    expect(rename.compareDocumentPosition(del) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelector(".channel-danger")?.previousElementSibling?.querySelector("table, .table-scroll")).not.toBeNull();
   });
 });

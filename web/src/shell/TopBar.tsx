@@ -4,7 +4,7 @@ import { BaxterSmall } from "../components/Baxter";
 import { Button } from "../components/Button";
 import { ChevronDownIcon } from "../components/icons";
 import { useAuth } from "./AuthProvider";
-import { isCurrent, navItems } from "./Rail";
+import { isCurrent, NavLabel, navItems } from "./Rail";
 
 /** The shell below 880 px: a 56 px bar with the brand and a Menu disclosure holding navigation and the account. */
 export function TopBar() {
@@ -71,7 +71,7 @@ export function TopBar() {
           {navItems(admin).map((i) => (
             <li key={i.to}>
               <Link to={i.to} className="rail-link" aria-current={isCurrent(i.to, pathname) ? "page" : undefined}>
-                {i.label}
+                <NavLabel to={i.to} label={i.label} />
               </Link>
             </li>
           ))}

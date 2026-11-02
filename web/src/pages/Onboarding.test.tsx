@@ -37,7 +37,7 @@ describe("Onboarding", () => {
     role = "reviewer";
     mockApi(() => undefined);
     renderPage(<Onboarding onReceived={() => undefined} />);
-    expect(screen.getByText("Ask an admin for the ingest key.")).toBeTruthy();
+    expect(screen.getByText("Ask an admin for an ingest key.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Create a key" })).toBeNull();
   });
 
@@ -49,5 +49,34 @@ describe("Onboarding", () => {
     await vi.advanceTimersByTimeAsync(5100);
     vi.useRealTimers();
     expect(onReceived).toHaveBeenCalledTimes(1);
+  });
+
+  it("Create a key is step one", () => {
+    mockApi(() => undefined);
+    renderPage(<Onboarding onReceived={() => undefined} />);
+    const steps = document.querySelectorAll(".steps > li");
+    expect(steps).toHaveLength(2);
+    expect(steps[0]?.textContent).toContain("Create an ingest key for the Default channel.");
+    expect(steps[0]?.querySelector("button")?.textContent).toBe("Create a key");
+    expect(steps[0]?.textContent).toContain("Or use the key printed in the server log at first boot:");
+    expect(steps[0]?.querySelector('[aria-label="Find the key in the log"]')).not.toBeNull();
+    expect(steps[1]?.textContent).toContain("Send a test message:");
+  });
+
+  it("no Web SDK line", () => {
+    mockApi(() => undefined);
+    renderPage(<Onboarding onReceived={() => undefined} />);
+    expect(screen.queryByText(/Web SDK/)).toBeNull();
+    expect(screen.queryByText(/switches to the inbox/)).toBeNull();
+  });
+
+  it("shows the waiting indicator as a status", () => {
+    mockApi(() => undefined);
+    renderPage(<Onboarding onReceived={() => undefined} />);
+    const status = document.querySelector<HTMLElement>("p.waiting");
+    expect(status?.getAttribute("role")).toBe("status");
+    if (!status) throw new Error("no waiting line");
+    expect(status.textContent).toBe("Waiting for your first feedback…");
+    expect(status.querySelector(".waiting-dot")?.getAttribute("aria-hidden")).toBe("true");
   });
 });

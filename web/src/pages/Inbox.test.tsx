@@ -1,5 +1,6 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { removeFeedback } from "../feedback/listStore";
 import { clearFeedbackCache } from "../feedback/useFeedbackList";
 import { fb, mockApi, renderPage, type Answer, type Call } from "../feedback/testHelpers";
 import type { Feedback } from "../lib/types";
@@ -182,5 +183,128 @@ describe("Inbox tab counts", () => {
     await waitFor(() => expect(radio(/^New/).closest("label")?.textContent).toContain("5"));
     expect(radio(/^New/).closest("label")?.textContent).not.toContain("11");
     expect(radio(/^Reviewed/).closest("label")?.textContent).toContain("2");
+  });
+});
+
+describe("Inbox freshness", () => {
+  let counts = { total: 2, byStatus: { new: 1, reviewed: 1 } as Record<string, number> };
+  const live = (list: (url: URL) => Feedback[] = () => [other]) =>
+    mockApi((c: Call) => {
+      const url = new URL(c.path, "http://x");
+      if (url.pathname === "/api/stats") return { body: { ...counts, byChannel: [], byTag: [] } };
+      if (url.pathname === "/api/channels") return { body: { items: [{ id: "ch_1", name: "Web", createdAt: "x" }] } };
+      if (url.pathname === "/api/tags") return { body: { items: [] } };
+      if (c.method === "GET" && url.pathname === "/api/feedback") return { body: { items: list(url), nextCursor: null } };
+      return undefined;
+    });
+  const poll = async () => {
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+  };
+
+  beforeEach(() => {
+    counts = { total: 2, byStatus: { new: 1, reviewed: 1 } };
+  });
+
+  it("shows the new pill when the total grows", async () => {
+    live();
+    renderPage(<Inbox />);
+    await screen.findByRole("link", { name: "Love the new look" });
+    expect(screen.queryByRole("button", { name: /new · Show/ })).toBeNull();
+    counts = { total: 5, byStatus: { new: 4, reviewed: 1 } };
+    await poll();
+    expect(await screen.findByRole("button", { name: "3 new · Show" })).toBeTruthy();
+    // The poll alone never inserts rows.
+    expect(screen.getAllByRole("link", { name: /Love the new look/ })).toHaveLength(1);
+    await waitFor(() => expect(radio(/^New/).closest("label")?.textContent).toContain("4"));
+  });
+
+  it("Show reloads the list and hides the pill", async () => {
+    let rows = [other];
+    const { calls } = live(() => rows);
+    renderPage(<Inbox />);
+    await screen.findByRole("link", { name: "Love the new look" });
+    const before = feedbackCalls(calls).length;
+    counts = { total: 3, byStatus: { new: 2, reviewed: 1 } };
+    rows = [crash, other];
+    await poll();
+    const pill = await screen.findByRole("button", { name: "1 new · Show" });
+    pill.focus();
+    fireEvent.click(pill);
+    await screen.findByRole("link", { name: "App crash on launch" });
+    expect(feedbackCalls(calls).length).toBeGreaterThan(before);
+    expect(screen.queryByRole("button", { name: /new · Show/ })).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("announcer").textContent).toBe("Showing 1 new item."));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("link", { name: "App crash on launch" })));
+  });
+
+  it("the first arrivals after onboarding do not count as new", async () => {
+    counts = { total: 0, byStatus: {} };
+    live(() => []);
+    renderPage(<Inbox />);
+    await screen.findByRole("heading", { name: "Send your first feedback" });
+    await poll();
+    counts = { total: 1, byStatus: { new: 1 } };
+    live(() => [other]);
+    await poll();
+    await screen.findByRole("link", { name: "Love the new look" });
+    expect(screen.queryByRole("button", { name: /new · Show/ })).toBeNull();
+    counts = { total: 20, byStatus: { new: 20 } };
+    await poll();
+    expect(await screen.findByRole("button", { name: "19 new · Show" })).toBeTruthy();
+  });
+
+  it("no pill on the Reviewed tab", async () => {
+    live(() => [crash]);
+    renderPage(<Inbox />, { at: "/?status=reviewed" });
+    await screen.findByRole("link", { name: "App crash on launch" });
+    counts = { total: 6, byStatus: { new: 5, reviewed: 1 } };
+    await poll();
+    await waitFor(() => expect(radio(/^New/).closest("label")?.textContent).toContain("5"));
+    expect(screen.queryByRole("button", { name: /new · Show/ })).toBeNull();
+  });
+
+  it("own deletions do not count as new", async () => {
+    live();
+    renderPage(<Inbox />);
+    await screen.findByRole("link", { name: "Love the new look" });
+    // The user deletes one item, then something else raises the total back to where it began.
+    counts = { total: 1, byStatus: { new: 0, reviewed: 1 } };
+    act(() => removeFeedback(["fb_1"]));
+    await waitFor(() => expect(radio(/^All/).closest("label")?.textContent).toContain("1"));
+    await poll();
+    expect(screen.queryByRole("button", { name: /new · Show/ })).toBeNull();
+    counts = { total: 2, byStatus: { new: 1, reviewed: 1 } };
+    await poll();
+    expect(await screen.findByRole("button", { name: "1 new · Show" })).toBeTruthy();
+  });
+
+  it("inbox zero offers reviewed items when some wait", async () => {
+    counts = { total: 4, byStatus: { reviewed: 4 } };
+    live((url) => (url.searchParams.get("status") === "reviewed" ? [crash] : []));
+    renderPage(<Inbox />);
+    await screen.findByRole("heading", { name: "No new feedback" });
+    expect(screen.getByText("4 reviewed items are still open.")).toBeTruthy();
+    expect(document.querySelector(".empty svg")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show 4 reviewed" }));
+    await waitFor(() => expect(radio(/^Reviewed/).checked).toBe(true));
+    await screen.findByRole("link", { name: "App crash on launch" });
+  });
+
+  it("inbox zero keeps today's copy with nothing reviewed", async () => {
+    counts = { total: 1, byStatus: { actioned: 1 } };
+    live(() => []);
+    renderPage(<Inbox />);
+    await screen.findByRole("heading", { name: "No new feedback" });
+    expect(screen.getByText("New feedback appears here as it arrives.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /reviewed/ })).toBeNull();
+  });
+
+  it("filtered empty names the filters", async () => {
+    live(() => []);
+    renderPage(<Inbox />, { at: "/?status=reviewed&tag=bug" });
+    await screen.findByRole("heading", { name: "No matches" });
+    expect(screen.getByText("Nothing in Reviewed tagged bug.")).toBeTruthy();
   });
 });

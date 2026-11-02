@@ -230,11 +230,12 @@
 }
 
 .row-selected {
-  background: var(--dusk-tint);
+  background: var(--selection);
 }
 
+/* Between two selected rows: dusk is 2.6:1 on the selection tint (kraft was 1.4:1) */
 .row-selected + .row-selected {
-  border-top: 1px solid var(--kraft);
+  border-top: 1px solid var(--dusk);
 }
 
 .row {
@@ -320,8 +321,15 @@
   gap: var(--s-1);
 }
 
+/* Pill text is ink soft on card stock (7.3:1); the bark ring (4.0:1 on the selection) keeps the shape visible */
 .row-selected .pill {
   background: var(--card-stock);
+  box-shadow: inset 0 0 0 1px var(--bark);
+}
+
+/* Ignored chip: bark dashes are 4.0:1 on the selection; its text moves from ink muted (3.5:1) to ink soft (5.1:1) */
+.row-selected .chip-ignored {
+  color: var(--ink-soft);
 }
 
 .row-selected .marker-new {
@@ -354,12 +362,26 @@
   font-size: var(--fs-meta);
 }
 
-.shortcuts {
-  margin-top: var(--s-6);
+/* Keyboard shortcuts dialog */
+.shortcut-group {
+  margin-bottom: var(--s-4);
+}
+
+.shortcut-title {
+  margin-bottom: var(--s-2);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+}
+
+/* One fixed key column, so every group's meanings start at the same x */
+.dialog.dialog-wide {
+  width: min(560px, calc(100vw - 32px));
 }
 
 .shortcut-list {
-  margin-top: var(--s-2);
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: var(--s-2) var(--s-4);
 }
 
 .shortcut-item {
@@ -367,8 +389,46 @@
 }
 
 .shortcut-list dt {
-  font-size: var(--fs-ui-sm);
   color: var(--ink);
+  font-size: var(--fs-ui-sm);
+}
+
+.shortcut-list dd {
+  color: var(--ink-soft);
+  font-size: var(--fs-ui-sm);
+}
+
+.shortcut-setting {
+  margin-bottom: var(--s-3);
+}
+
+.shortcut-setting .muted {
+  margin-left: var(--s-6);
+  font-size: var(--fs-meta);
+}
+
+/* The faint key hint inside a button */
+.kbd-hint {
+  margin-left: var(--s-1);
+  padding: 0 4px;
+  background: none;
+  border: var(--border-hairline);
+  border-radius: var(--radius-button);
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-regular);
+}
+
+/* On the primary button the hint takes the button's own text colour: paper on dusk, ink-soft on oat when disabled. */
+.btn-primary .kbd-hint {
+  color: inherit;
+  border-color: currentColor;
+}
+
+.toast .kbd-hint {
+  color: var(--paper);
+  border-color: var(--paper);
 }
 
 kbd {
@@ -444,6 +504,12 @@ kbd {
 
 .status-actions .btn {
   width: 100%;
+  white-space: nowrap;
+}
+
+/* Clear of the "More from this user" link above it */
+.detail-removal {
+  margin-top: var(--s-10);
 }
 
 @media (max-width: 559px) {
@@ -747,5 +813,89 @@ html:has(.status-bar) {
   .bulk .btn {
     min-width: var(--target);
     padding: 0 var(--s-2);
+  }
+}
+
+/* Detail: copy actions, structured metadata */
+.copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: calc(var(--s-6) * -1) 0 var(--s-8);
+}
+
+.facts dd.meta-text {
+  white-space: pre-line;
+}
+
+.meta-json {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Per-user */
+.user-summary {
+  margin-bottom: var(--s-4);
+}
+
+.user-done {
+  margin: var(--s-6) 0 var(--s-2);
+  color: var(--ink);
+}
+
+/* "3 new · Show" above the list: card stock, kraft border, pill shape, 44 px target */
+.new-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  margin-bottom: var(--s-2);
+  padding: 0 var(--s-4);
+  background: var(--card-stock);
+  border: var(--border-kraft);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+
+.new-pill:hover {
+  background: var(--oat);
+}
+
+/* Onboarding: the live "waiting" line. The dusk dot is the New dot (3.1:1 on paper is not needed: the words carry the meaning). */
+.waiting {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--ink-soft);
+}
+
+.waiting-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--dusk);
+  border-radius: var(--radius-pill);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .waiting-dot {
+    animation: waiting-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes waiting-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }

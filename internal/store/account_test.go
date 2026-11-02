@@ -330,3 +330,40 @@ func TestDatabaseSize(t *testing.T) {
 		}
 	})
 }
+
+func TestListChannelsLastReceivedAt(t *testing.T) {
+	storetest.ForEachDialect(t, func(t *testing.T, db *store.DB) {
+		ctx, d := context.Background(), db.Dialect
+		tn, main := newTenant(t, db, "acme")
+		other, otherMain := newTenant(t, db, "other")
+		empty, err := store.CreateChannel(ctx, db.SQL, d, tn.ID, "empty", 2000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		created, err := store.CreateChannel(ctx, db.SQL, d, tn.ID, "new", 3000)
+		if err != nil || created.LastReceivedAt != nil {
+			t.Fatalf("create = %+v, %v", created, err)
+		}
+		seedFB(t, db, tn, main.ID, "fb_1", "old", nil, 100)
+		seedFB(t, db, tn, main.ID, "fb_2", "newest", nil, 900)
+		seedFB(t, db, tn, main.ID, "fb_3", "middle", nil, 500)
+		seedFB(t, db, other, otherMain.ID, "fb_4", "elsewhere", nil, 5000)
+		list, err := store.ListChannels(ctx, db.SQL, d, tn.ID)
+		if err != nil || len(list) != 3 {
+			t.Fatalf("list = %+v, %v", list, err)
+		}
+		if got := list[0]; got.ID != main.ID || got.LastReceivedAt == nil || *got.LastReceivedAt != 900 {
+			t.Errorf("main = %+v", got)
+		}
+		if got := list[1]; got.ID != empty.ID || got.LastReceivedAt != nil {
+			t.Errorf("empty = %+v", got)
+		}
+		if list[2].LastReceivedAt != nil {
+			t.Errorf("new = %+v", list[2])
+		}
+		olist, err := store.ListChannels(ctx, db.SQL, d, other.ID)
+		if err != nil || len(olist) != 1 || olist[0].LastReceivedAt == nil || *olist[0].LastReceivedAt != 5000 {
+			t.Errorf("other tenant list = %+v, %v", olist, err)
+		}
+	})
+}

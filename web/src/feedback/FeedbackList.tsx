@@ -8,12 +8,12 @@ import { errorMessage } from "../lib/api";
 import { addTags, bulkStatus, removeTags, setStatus } from "../lib/endpoints";
 import { matchesFilters } from "../lib/filters";
 import { useNarrow } from "../lib/useMediaQuery";
+import { getPrefs } from "../lib/prefs";
 import { shortcutFor, type KeyLike, type ShortcutAction } from "../lib/shortcuts";
 import type { Feedback, Filters, Status, TagCount } from "../lib/types";
 import "../styles/feedback.css";
 import { FeedbackRow } from "./FeedbackRow";
 import { ListHeader, type FilterChip, type SelectNotice } from "./ListHeader";
-import { ShortcutHelp } from "./ShortcutHelp";
 import { applyFeedback, getList, listKey, removeFeedback, subscribe } from "./listStore";
 import type { FromList } from "./origin";
 import { SELECT_CAP, selectMatching, type Matching } from "./selectMatching";
@@ -42,6 +42,8 @@ interface FeedbackListProps {
   onClearAll?: () => void;
   /** Existing tags with their counts, offered by the bulk bar's tag editor. */
   tags?: TagCount[];
+  /** Bump `key` to reload the list from the server; `focusFirst` then puts focus on the first row. */
+  reload?: { key: number; focusFirst: boolean };
 }
 
 function keyLike(e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean }, target: EventTarget | null): KeyLike {
@@ -65,6 +67,8 @@ function keyLike(e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: b
 const LOADING_DELAY_MS = 300;
 
 const dialogOpen = () => document.querySelector('[aria-modal="true"]') !== null;
+/** The shortcut context at key time: the single-key switch is read now, not from a stale render. */
+const shortcutCtx = () => ({ dialogOpen: dialogOpen(), singleKeys: getPrefs().singleKeys });
 
 function withTag(item: Feedback, tag: string): Feedback {
   if (item.tags.some((t) => t.toLowerCase() === tag.toLowerCase())) return item;
@@ -83,6 +87,7 @@ export function FeedbackList({
   chips = [],
   onClearAll,
   tags = [],
+  reload,
 }: FeedbackListProps) {
   const list = useFeedbackList(filters);
   const { items } = list;
@@ -109,7 +114,6 @@ export function FeedbackList({
   const now = useNow();
   const [busy, setBusy] = useState(0);
   const [restoreIds, setRestoreIds] = useState<ReadonlySet<string> | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
   // A "t" press asks the bulk bar to open its tag popover; the popover clears the request.
   const [tagOpen, setTagOpen] = useState(false);
   const narrow = useNarrow();
@@ -137,6 +141,8 @@ export function FeedbackList({
     emptyEl.current = el;
   }, []);
   const pendingNext = useRef<string | null>(null);
+  // Set when the pending move came from Shift+j: the row it lands on is selected too.
+  const pendingExtend = useRef(false);
 
   const currentId = items.some((i) => i.id === current) ? current : (items[0]?.id ?? null);
   const { setFocused } = list;
@@ -213,6 +219,27 @@ export function FeedbackList({
     if (first) focusRow(first.id);
   }, [restoreIds, items, focusRow]);
 
+  // An explicit reload (the inbox's "N new · Show"): fetch again, and optionally land on the first row.
+  const reloadSeen = useRef(reload?.key ?? 0);
+  const reloadFocus = useRef<{ sawLoading: boolean } | null>(null);
+  const reloadList = list.reload;
+  useEffect(() => {
+    if (reload === undefined || reload.key === reloadSeen.current) return;
+    reloadSeen.current = reload.key;
+    reloadFocus.current = reload.focusFirst ? { sawLoading: false } : null;
+    reloadList();
+  }, [reload, reloadList]);
+  useEffect(() => {
+    const pending = reloadFocus.current;
+    if (pending === null) return;
+    if (list.loading) pending.sawLoading = true;
+    else if (pending.sawLoading) {
+      reloadFocus.current = null;
+      const first = items[0]?.id ?? null;
+      if (first !== null) focusRow(first);
+    }
+  }, [list.loading, items, focusRow]);
+
   // `j` on the last row loads more, then moves on to the first new row.
   const { loading, loadMore } = list;
   useEffect(() => {
@@ -221,9 +248,13 @@ export function FeedbackList({
     const idx = items.findIndex((i) => i.id === prev);
     if (idx >= 0 && idx + 1 < items.length) {
       pendingNext.current = null;
-      focusRow(items[idx + 1]?.id ?? null);
+      const landed = items[idx + 1]?.id ?? null;
+      if (pendingExtend.current && landed !== null) addToSelection([landed]);
+      pendingExtend.current = false;
+      focusRow(landed);
     } else if (!loading) {
       pendingNext.current = null;
+      pendingExtend.current = false;
     }
   }, [items, loading, focusRow]);
 
@@ -235,6 +266,17 @@ export function FeedbackList({
     setSelected(next);
     // A selection on a narrow screen (an x press, a checkbox) is Select mode.
     if (narrow && next.size > 0) setSelectMode(true);
+  };
+
+  // Adds rows to the selection (never removes). Functional, so it also works after an await.
+  const addToSelection = (ids: string[]) => {
+    setMatching(null);
+    setSelected((cur) => {
+      const next = new Set(cur);
+      for (const id of ids) next.add(id);
+      return next;
+    });
+    if (narrow) setSelectMode(true);
   };
 
   const onSelectMode = (on: boolean) => {
@@ -262,6 +304,31 @@ export function FeedbackList({
       return;
     }
     if (target >= 0) focusRow(items[target]?.id ?? null);
+  };
+
+  // Shift+j / Shift+k: select the current row, move on and select that one too.
+  const extendBy = (delta: number) => {
+    if (currentId === null) return;
+    const idx = items.findIndex((i) => i.id === currentId);
+    if (idx < 0) return;
+    if (anchor.current === null) anchor.current = { id: currentId, on: true };
+    const target = idx + delta;
+    if (target >= items.length) {
+      addToSelection([currentId]);
+      if (list.nextCursor !== null) {
+        pendingNext.current = currentId;
+        pendingExtend.current = true;
+        loadMore();
+      }
+      return;
+    }
+    const to = items[target]?.id;
+    if (to === undefined) {
+      addToSelection([currentId]);
+      return;
+    }
+    addToSelection([currentId, to]);
+    focusRow(to);
   };
 
   const applyStatus = async (status: Status) => {
@@ -422,6 +489,12 @@ export function FeedbackList({
       case "prev":
         moveBy(-1);
         return;
+      case "extendNext":
+        extendBy(1);
+        return;
+      case "extendPrev":
+        extendBy(-1);
+        return;
       case "toggleSelect":
         if (currentId !== null) toggle(currentId);
         return;
@@ -456,7 +529,7 @@ export function FeedbackList({
         setTagOpen(true);
         return;
       default:
-        // focusSearch and toggleHelp are the document handler's; undo and back belong elsewhere.
+        // focusSearch is the document handler's, toggleHelp the shortcuts dialog's; undo and back belong elsewhere.
         return;
     }
   };
@@ -472,7 +545,7 @@ export function FeedbackList({
     e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; preventDefault: () => void },
     target: EventTarget | null,
   ) => {
-    const action = shortcutFor(keyLike(e, target), { dialogOpen: dialogOpen() });
+    const action = shortcutFor(keyLike(e, target), shortcutCtx());
     if (action === null || action === "focusSearch" || action === "toggleHelp" || action === "undo" || action === "back") {
       return;
     }
@@ -487,7 +560,7 @@ export function FeedbackList({
   const handleKeyRef = useRef(handleListKey);
   handleKeyRef.current = handleListKey;
 
-  // "/" and "?" work anywhere on the page; Escape in the search box returns to the current row.
+  // "/" works anywhere on the page; Escape in the search box returns to the current row.
   useEffect(() => {
     const onDoc = (e: KeyboardEvent) => {
       const box = searchRef?.current;
@@ -499,7 +572,7 @@ export function FeedbackList({
       }
       const t = e.target;
       if (t === document.body || (t instanceof HTMLElement && (t.tagName === "MAIN" || t.tagName === "H1"))) {
-        const listAction = shortcutFor(keyLike(e, t), { dialogOpen: dialogOpen() });
+        const listAction = shortcutFor(keyLike(e, t), shortcutCtx());
         if (listAction === "next" || listAction === "prev") {
           // First press from outside the list lands on the current row.
           e.preventDefault();
@@ -508,18 +581,33 @@ export function FeedbackList({
         }
         handleKeyRef.current(e, t);
       }
-      const action = shortcutFor(keyLike(e, e.target), { dialogOpen: dialogOpen() });
+      const action = shortcutFor(keyLike(e, e.target), shortcutCtx());
       if (action === "focusSearch" && box) {
         e.preventDefault();
         box.focus();
-      } else if (action === "toggleHelp") {
-        e.preventDefault();
-        setHelpOpen((o) => !o);
       }
     };
     document.addEventListener("keydown", onDoc);
     return () => document.removeEventListener("keydown", onDoc);
   }, [searchRef, currentId, focusRow]);
+
+  // Near the end of the list, the next page loads by itself (one request at a time; the button stays as the fallback).
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  const hasMore = list.nextCursor !== null;
+  const failed = list.error !== null;
+  useEffect(() => {
+    const el = moreRef.current;
+    if (el === null || !hasMore || stale || failed || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMore();
+      },
+      { rootMargin: "0px 0px 400px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+    // Observing again after every page makes a block that is still in view load the next one.
+  }, [hasMore, stale, failed, items.length, loadMore]);
 
   const allSelected = items.length > 0 && items.every((i) => selected.has(i.id));
   const total = count ?? (list.nextCursor === null ? items.length : null);
@@ -611,11 +699,13 @@ export function FeedbackList({
             ))}
           </ul>
           {list.nextCursor !== null ? (
-            <div className="load-more">
+            <div className="load-more" ref={moreRef}>
               <Button variant="text" loading={list.loading} loadingLabel="Loading…" onClick={loadMore}>
                 Load more
               </Button>
-              <p className="muted">Showing {items.length}</p>
+              <p className="muted">
+                {count !== null && count > items.length ? `Showing ${items.length} of ${count}` : `Showing ${items.length}`}
+              </p>
             </div>
           ) : null}
         </>
@@ -626,7 +716,6 @@ export function FeedbackList({
       ) : list.error ? null : (
         renderEmpty(emptyRef)
       )}
-      <ShortcutHelp open={helpOpen} onToggle={() => setHelpOpen((o) => !o)} />
     </div>
   );
 }

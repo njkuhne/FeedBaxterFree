@@ -21,3 +21,8 @@ export function emptyCopy(filters: Filters, channelName?: string): { heading: st
   if (q !== "") parts.push(`matching "${q}"`);
   return { heading: "No matches", body: `Nothing ${parts.join(" ")}.` };
 }
+
+/** Inbox zero with reviewed items still waiting: the body names them. */
+export function reviewedWaiting(reviewed: number): string {
+  return `${reviewed} reviewed ${reviewed === 1 ? "item is" : "items are"} still open.`;
+}

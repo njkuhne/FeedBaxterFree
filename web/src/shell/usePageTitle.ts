@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { useNewCount } from "./NewCount";
 
 let firstPage = true;
 
@@ -10,10 +11,12 @@ let firstPage = true;
  */
 export function usePageTitle(title: string | null): void {
   const { pathname: key } = useLocation(); // query-string changes (filters) must not steal focus
+  const newCount = useNewCount();
+  const prefix = newCount !== null && newCount > 0 ? `(${newCount}) ` : "";
   const focusedFor = useRef<string | null>(null);
   useEffect(() => {
     if (title === null) return;
-    document.title = `${title} · FeedBaxter`;
+    document.title = `${prefix}${title} · FeedBaxter`;
     if (focusedFor.current === key) return;
     focusedFor.current = key;
     if (firstPage) {
@@ -21,5 +24,5 @@ export function usePageTitle(title: string | null): void {
       return;
     }
     document.querySelector<HTMLElement>("main h1, h1")?.focus();
-  }, [title, key]);
+  }, [title, key, prefix]);
 }

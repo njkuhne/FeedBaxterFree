@@ -77,9 +77,9 @@ Notable 409 messages: "An organisation needs at least one admin." (demoting or r
 
 **Token**: `{ "id", "name", "prefix", "createdAt", "lastUsedAt" }` (`lastUsedAt` is null until first use). `prefix` is the first 12 characters of the secret, for recognition.
 
-**Channel**: `{ "id", "name", "createdAt" }`.
+**Channel**: `{ "id", "name", "createdAt", "lastReceivedAt" }`. `lastReceivedAt` is the time of the newest feedback in the channel; null when it has none.
 
-**Key**: `{ "id", "channelId", "prefix", "createdAt", "revokedAt" }`. `revokedAt` is null while the key is active.
+**Key**: `{ "id", "channelId", "prefix", "createdAt", "revokedAt", "lastUsedAt" }`. `revokedAt` is null while the key is active. `lastUsedAt` is when the key last sent feedback that was stored, updated at most once a minute; null until first use.
 
 **Feedback**:
 
@@ -267,7 +267,7 @@ All three bulk routes take `ids`: 1 to 500 IDs. Empty strings and duplicates are
 
 `GET /api/feedback/export?format=csv|json` plus the filters above (no `limit` or `cursor`; all matching items, newest first). `format` is required: 400 "Format must be csv or json." Navigate to it or fetch it as a download; it is a GET and needs no CSRF header.
 
-- Headers: `Content-Disposition: attachment; filename="feedback-YYYYMMDD.csv"` (or `.json`, date is UTC today), `Content-Type: text/csv; charset=utf-8` or `application/json`.
+- Headers: `Content-Disposition: attachment; filename="feedbaxter-<status>[-<tag>]-<YYYY-MM-DD>.<csv|json>"`. `<status>` is the status filter (several joined with `-`, in the order given) or `all`; `-<tag>` appears only with a tag filter: lowercased, each run of characters outside `a-z0-9` becomes one `-`, trimmed, cut to 40 characters, omitted if nothing is left. The date is UTC today. Channel, search and user filters are not in the name. Example: `feedbaxter-reviewed-safari-export-2026-11-01.csv`, `Content-Type: text/csv; charset=utf-8` or `application/json`.
 - JSON: one array of Feedback objects, same shape as the list (no `history`). No matches gives `[]`.
 - CSV: RFC 4180 quoting, CRLF line endings, header row then one row per item. Columns: `id`, `received_at`, `status`, `channel`, `user_id`, `platform`, `app_version`, `tags`, `message`, `metadata`. `channel` is the channel name (empty if deleted), `tags` are joined with `; `, `metadata` is the JSON text, nulls are empty cells. Cells in the text columns that start with `=`, `+`, `-`, `@`, tab or carriage return get a leading `'` so spreadsheets do not run them as formulas (`received_at`, `status` and `metadata` are not altered).
 - Validation errors (format, filters) come back as a normal JSON error before the download starts. If a failure happens after streaming has begun, the server aborts the connection instead of finishing the file, so a broken download looks like a network error, not a complete but truncated file. Show a generic "export failed" message.

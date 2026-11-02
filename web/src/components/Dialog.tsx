@@ -27,6 +27,8 @@ interface DialogProps {
   /** Element that gets focus on open; defaults to the first focusable element. */
   initialFocusRef?: RefObject<HTMLElement | null>;
   children?: ReactNode;
+  /** Extra class on the panel (a wider dialog, for example). */
+  className?: string;
 }
 
 export function Dialog({
@@ -37,6 +39,7 @@ export function Dialog({
   busy = false,
   initialFocusRef,
   children,
+  className,
 }: DialogProps) {
   const titleId = useId();
   const descId = useId();
@@ -83,7 +86,7 @@ export function Dialog({
     <div className="scrim">
       <div
         ref={panel}
-        className="dialog"
+        className={className === undefined ? "dialog" : `dialog ${className}`}
         role={role}
         aria-modal="true"
         aria-labelledby={titleId}

@@ -46,6 +46,7 @@ type IngestKey struct {
 	ID, TenantID, ChannelID, Prefix, Hash string
 	CreatedAt                             int64
 	RevokedAt                             *int64
+	LastUsedAt                            *int64 // Unix ms of the last stored feedback; nil until first use
 }
 
 // CreateIngestKey stores the hash and display prefix of plaintext.
@@ -147,7 +148,7 @@ func GetIngestKeyForCache(ctx context.Context, q Querier, d Dialect, keyID strin
 	return c, nil
 }
 
-const ingestKeyCols = "id, tenant_id, channel_id, prefix, hash, created_at, revoked_at"
+const ingestKeyCols = "id, tenant_id, channel_id, prefix, hash, created_at, revoked_at, last_used_at"
 
 // ListIngestKeys returns the tenant's keys, newest first; channelID "" lists
 // every channel's keys.
@@ -166,7 +167,7 @@ func ListIngestKeys(ctx context.Context, q Querier, d Dialect, tenantID, channel
 	var out []IngestKey
 	for rows.Next() {
 		var k IngestKey
-		if err := rows.Scan(&k.ID, &k.TenantID, &k.ChannelID, &k.Prefix, &k.Hash, &k.CreatedAt, &k.RevokedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.TenantID, &k.ChannelID, &k.Prefix, &k.Hash, &k.CreatedAt, &k.RevokedAt, &k.LastUsedAt); err != nil {
 			return nil, fmt.Errorf("store: list ingest keys: %w", err)
 		}
 		out = append(out, k)
@@ -182,7 +183,7 @@ func GetIngestKey(ctx context.Context, q Querier, d Dialect, tenantID, id string
 	var k IngestKey
 	err := q.QueryRowContext(ctx, d.Rebind(
 		"SELECT "+ingestKeyCols+" FROM ingest_keys WHERE tenant_id = ? AND id = ?"), tenantID, id).
-		Scan(&k.ID, &k.TenantID, &k.ChannelID, &k.Prefix, &k.Hash, &k.CreatedAt, &k.RevokedAt)
+		Scan(&k.ID, &k.TenantID, &k.ChannelID, &k.Prefix, &k.Hash, &k.CreatedAt, &k.RevokedAt, &k.LastUsedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return IngestKey{}, fmt.Errorf("store: get ingest key: %w", ErrNotFound)
 	}
@@ -219,4 +220,24 @@ func RevokeChannelKeys(ctx context.Context, q Querier, d Dialect, tenantID, chan
 		return nil, fmt.Errorf("store: revoke channel keys: %w", err)
 	}
 	return ids, nil
+}
+
+// KeyTouch records that a key was used at At (Unix ms).
+type KeyTouch struct {
+	TenantID, KeyID string
+	At              int64
+}
+
+// TouchIngestKeys sets last_used_at = at for each key in the tenant whose
+// last_used_at is NULL or older than at. Unknown or deleted keys are ignored.
+func TouchIngestKeys(ctx context.Context, q Querier, d Dialect, touches []KeyTouch) error {
+	for _, t := range touches {
+		_, err := q.ExecContext(ctx, d.Rebind(
+			"UPDATE ingest_keys SET last_used_at = ? WHERE tenant_id = ? AND id = ? AND (last_used_at IS NULL OR last_used_at < ?)"),
+			t.At, t.TenantID, t.KeyID, t.At)
+		if err != nil {
+			return fmt.Errorf("store: touch ingest keys: %w", err)
+		}
+	}
+	return nil
 }

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listKey, setList } from "../feedback/listStore";
-import { fb, mockApi, renderPage, renderRoutes, type Call } from "../feedback/testHelpers";
+import { fb, labelOf, mockApi, renderPage, renderRoutes, type Call } from "../feedback/testHelpers";
 import { mockMatchMedia } from "../test-media";
 import type { FeedbackDetail as Detail, Role, Status } from "../lib/types";
 import FeedbackDetail from "./FeedbackDetail";
@@ -59,11 +59,11 @@ describe("FeedbackDetail", () => {
     const first = setup(detail({ status: "new" }));
     expect(await screen.findByRole("button", { name: "Mark reviewed" })).toBeTruthy();
     expect(document.querySelectorAll(".btn-primary")).toHaveLength(1);
-    expect(document.querySelector(".btn-primary")?.textContent).toBe("Mark reviewed");
+    expect(labelOf(document.querySelector(".btn-primary"))).toBe("Mark reviewed");
     first.unmount();
     const second = setup(detail({ status: "reviewed" }));
     await screen.findByRole("button", { name: "Mark actioned" });
-    expect(document.querySelector(".btn-primary")?.textContent).toBe("Mark actioned");
+    expect(labelOf(document.querySelector(".btn-primary"))).toBe("Mark actioned");
     expect(document.querySelectorAll(".btn-primary")).toHaveLength(1);
     second.unmount();
     setup(detail({ status: "actioned" }));
@@ -78,7 +78,7 @@ describe("FeedbackDetail", () => {
       const view = setup(detail({ status }));
       await screen.findByText("Message fb_1");
       const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(".status-actions button"));
-      expect(buttons.map((b) => b.textContent)).toEqual(labels);
+      expect(buttons.map((b) => labelOf(b))).toEqual(labels);
       expect(buttons.map((b) => b.disabled)).toEqual(order.map((s) => s === status));
       expect(document.querySelectorAll(".btn-primary").length).toBeLessThanOrEqual(1);
       view.unmount();
@@ -134,7 +134,7 @@ describe("FeedbackDetail", () => {
     gate.release();
     await waitFor(() => expect(calls.filter((c) => c.method === "PATCH")).toHaveLength(2));
     expect(calls.filter((c) => c.method === "PATCH").map((c) => c.body)).toEqual([{ status: "reviewed" }, { status: "actioned" }]);
-    await waitFor(() => expect(document.querySelector(".status-actions button:disabled")?.textContent).toBe("Mark actioned"));
+    await waitFor(() => expect(labelOf(document.querySelector(".status-actions button:disabled"))).toBe("Mark actioned"));
   });
 
   it("hides delete from reviewers and shows it to admins", async () => {
@@ -157,15 +157,15 @@ describe("FeedbackDetail", () => {
         ],
       }),
     );
-    expect(await screen.findByText(/New → Reviewed · a@example.com · via MCP/)).toBeTruthy();
-    expect(screen.getByText(/a removed user · via UI/)).toBeTruthy();
-    expect(screen.getByText(/^Received · /)).toBeTruthy();
+    expect(await screen.findByText(/Marked reviewed by a@example.com via MCP,/)).toBeTruthy();
+    expect(screen.getByText(/Marked ignored by a removed user,/)).toBeTruthy();
+    expect(screen.getByText(/^Received$/)).toBeTruthy();
   });
 
   it("shows metadata values as text and objects as JSON", async () => {
     setup(detail({ metadata: { screen: "export", plan: { tier: "pro" } } }));
     await screen.findByText("export");
-    expect(screen.getByText('{"tier":"pro"}')).toBeTruthy();
+    expect(document.querySelector(".meta-json")?.textContent).toBe('{\n  "tier": "pro"\n}');
   });
 
   it("shows the not-found state", async () => {
@@ -318,3 +318,131 @@ describe("FeedbackDetail on a narrow screen", () => {
     expect(document.querySelector(".status-bar")).toBeNull();
   });
 });
+
+describe("FeedbackDetail phase 3", () => {
+  let undoMedia: () => void = () => undefined;
+  const statsBody = (total: number) => ({ total, byStatus: {}, byChannel: [], byTag: [] });
+  afterEach(() => {
+    undoMedia();
+    undoMedia = () => undefined;
+  });
+
+  function withStats(d: Detail, total: number | null) {
+    return mockApi((c) => {
+      if (c.path.startsWith("/api/stats")) return total === null ? undefined : { body: statsBody(total) };
+      return routes(c, d);
+    });
+  }
+
+  function stubClipboard(ok: boolean) {
+    const writeText = vi.fn(() => (ok ? Promise.resolve() : Promise.reject(new Error("denied"))));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    return writeText;
+  }
+
+  it("Copy message copies the plain text with line breaks", async () => {
+    const writeText = stubClipboard(true);
+    setup(detail({ message: "Line one\nLine two" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Copy message" }));
+    await screen.findByText("Message copied.");
+    expect(writeText).toHaveBeenCalledWith("Line one\nLine two");
+  });
+
+  it("Copy message reports a failure", async () => {
+    stubClipboard(false);
+    // The textarea fallback has no execCommand in jsdom, so this fails too.
+    Object.defineProperty(document, "execCommand", { configurable: true, value: () => false });
+    setup(detail());
+    fireEvent.click(await screen.findByRole("button", { name: "Copy message" }));
+    await screen.findByText("Could not copy. Select the text and copy it manually.");
+  });
+
+  it("Copy link copies the item URL", async () => {
+    const writeText = stubClipboard(true);
+    setup(detail());
+    fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
+    await screen.findByText("Link copied.");
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/feedback/fb_1`);
+  });
+
+  it("nested metadata is pretty-printed as text", async () => {
+    setup(detail({ metadata: { plan: { tier: "pro", seats: [1, 2] }, count: 3, ok: true, gone: null } }));
+    await screen.findByText("count");
+    expect(document.querySelector("pre.meta-json")?.textContent).toBe(JSON.stringify({ tier: "pro", seats: [1, 2] }, null, 2));
+    const facts = document.querySelector("dl.facts") as HTMLElement;
+    expect(within(facts).getByText("3")).toBeTruthy();
+    expect(within(facts).getByText("true")).toBeTruthy();
+    expect(within(facts).getByText("null")).toBeTruthy();
+  });
+
+  it("metadata never renders HTML", async () => {
+    setup(detail({ metadata: { note: "<b>x</b>", more: { html: "<i>y</i>" } } }));
+    expect(await screen.findByText("<b>x</b>")).toBeTruthy();
+    expect(document.querySelector(".facts b, .facts i")).toBeNull();
+    expect(document.querySelector(".meta-json")?.textContent).toContain("<i>y</i>");
+  });
+
+  it("history lines are sentences", async () => {
+    setup(
+      detail({
+        history: [
+          { from: "new", to: "reviewed", userId: "us_1", userEmail: "a@example.com", via: "mcp", at: new Date(2026, 10, 1, 15, 57).toISOString() },
+        ],
+      }),
+    );
+    await screen.findByText(/Marked reviewed by a@example.com via MCP,/);
+    const lines = Array.from(document.querySelectorAll(".history li")).map((li) => li.textContent);
+    expect(lines).toEqual([expect.stringMatching(/^Received \d{1,2} \w{3} \d{4} \d{2}:\d{2}$/), "Marked reviewed by a@example.com via MCP, 1 Nov 2026 15:57"]);
+    expect(document.querySelectorAll(".history li time")).toHaveLength(2);
+  });
+
+  it("More from this user shows the count of other items", async () => {
+    const { calls } = withStats(detail({ userId: "usr_8f2a91" }), 4);
+    render_();
+    const link = await screen.findByRole("link", { name: "More from this user (3)" });
+    expect(link.getAttribute("href")).toBe("/user/usr_8f2a91");
+    expect(calls.filter((c) => c.path.startsWith("/api/stats?userId=usr_8f2a91"))).toHaveLength(1);
+  });
+
+  it("More from this user is hidden when there are no other items", async () => {
+    withStats(detail({ userId: "usr_8f2a91" }), 1);
+    render_();
+    await screen.findByText("Message fb_1");
+    await waitFor(() => expect(screen.queryByRole("link", { name: /More from this user/ })).toBeNull());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole("link", { name: /More from this user/ })).toBeNull();
+  });
+
+  it("More from this user shows without a count when the count is unknown", async () => {
+    withStats(detail({ userId: "usr_8f2a91" }), null);
+    render_();
+    expect(await screen.findByRole("link", { name: "More from this user" })).toBeTruthy();
+  });
+
+  it("Delete feedback sits in a Data removal section", async () => {
+    setup(detail());
+    const region = await screen.findByRole("region", { name: "Data removal" });
+    expect(within(region).getByText("Deleting is permanent. Deleted feedback still counts toward this month's limit.")).toBeTruthy();
+    expect(within(region).getByRole("button", { name: "Delete feedback" })).toBeTruthy();
+    // It is the last block on desktop.
+    expect(document.querySelector(".detail")?.lastElementChild).toBe(region);
+  });
+
+  it("status actions show key hints on desktop and not on narrow", async () => {
+    const first = setup(detail({ status: "new" }));
+    await screen.findByText("Message fb_1");
+    const hints = Array.from(document.querySelectorAll(".status-actions .kbd-hint")).map((k) => k.textContent);
+    expect(hints).toEqual(["e", "a", "i", "n"]);
+    expect(screen.getByRole("button", { name: "Mark reviewed" }).getAttribute("aria-keyshortcuts")).toBe("e");
+    first.unmount();
+    undoMedia = mockMatchMedia(true);
+    setup(detail({ status: "new" }));
+    await screen.findByText("Message fb_1");
+    expect(document.querySelectorAll(".status-actions .kbd-hint")).toHaveLength(0);
+    expect(document.querySelectorAll(".status-actions [aria-keyshortcuts]")).toHaveLength(0);
+  });
+});
+
+function render_() {
+  return renderPage(<FeedbackDetail />, { at: "/feedback/fb_1", route: "/feedback/:id" });
+}

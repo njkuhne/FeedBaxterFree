@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as 
 import { Button } from "../components/Button";
 import { STATUS_LABEL } from "../components/StatusMarker";
 import { ChevronDownIcon, DownloadIcon } from "../components/icons";
+import { downloadFile } from "../lib/download";
 import { exportUrl } from "../lib/endpoints";
 import { plural } from "../lib/format";
 import type { Filters } from "../lib/types";
@@ -63,22 +64,59 @@ interface ExportMenuProps {
 }
 
 interface ExportPanelProps extends ExportMenuProps {
-  /** Called after a download link is used (the popover closes itself). */
+  /** Called after an export succeeded (the popover closes itself). */
   onDone?: () => void;
 }
 
-/** What will be exported, and the CSV and JSON links. The popover and the narrow filters panel both show it. */
+/** What will be exported, and the CSV and JSON buttons. The popover and the narrow filters panel both show it. */
 export function ExportPanel({ filters, count, channelName, onDone }: ExportPanelProps) {
+  const [running, setRunning] = useState<"csv" | "json" | null>(null);
+  const [failed, setFailed] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const run = async (format: "csv" | "json") => {
+    setFailed(false);
+    setRunning(format);
+    try {
+      await downloadFile(exportUrl(filters, format));
+      if (alive.current) setRunning(null);
+      onDone?.();
+    } catch {
+      if (alive.current) {
+        setRunning(null);
+        setFailed(true);
+      }
+    }
+  };
+
   return (
     <>
       <p className="popover-note">{exportDescription(filters, count, channelName)}</p>
       <div className="popover-actions">
         {(["csv", "json"] as const).map((format) => (
-          <a key={format} className="btn btn-text" href={exportUrl(filters, format)} download onClick={() => onDone?.()}>
+          <Button
+            key={format}
+            variant="text"
+            loading={running === format}
+            loadingLabel="Exporting…"
+            disabled={running !== null}
+            onClick={() => void run(format)}
+          >
             {format.toUpperCase()}
-          </a>
+          </Button>
         ))}
       </div>
+      {failed ? (
+        <p role="alert" className="form-error">
+          Export failed. Try again.
+        </p>
+      ) : null}
     </>
   );
 }

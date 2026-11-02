@@ -24,10 +24,10 @@ export function PeopleTable({ users, currentUserId, onRoleChanged, onReset, onRe
   const [pending, setPending] = useState<string | null>(null);
   const [resetting, setResetting] = useState<PersonUser | null>(null);
   const [removing, setRemoving] = useState<PersonUser | null>(null);
+  const [roleChange, setRoleChange] = useState<{ user: PersonUser; role: Role } | null>(null);
   const adminCount = users.filter((u) => u.role === "admin").length;
 
   const changeRole = async (user: PersonUser, role: Role) => {
-    if (role === user.role) return;
     setPending(user.id);
     try {
       const updated = await api.setRole(user.id, role);
@@ -39,6 +39,12 @@ export function PeopleTable({ users, currentUserId, onRoleChanged, onReset, onRe
     } finally {
       setPending(null);
     }
+  };
+
+  const roleBody = (user: PersonUser, role: Role): string => {
+    if (role === "admin") return "Admins can delete feedback and manage channels, keys and people.";
+    const base = "Reviewers can read, triage, tag and export, but cannot delete or manage.";
+    return user.id === currentUserId ? `${base} You will lose access to admin pages.` : base;
   };
 
   return (
@@ -66,21 +72,30 @@ export function PeopleTable({ users, currentUserId, onRoleChanged, onReset, onRe
                     {u.email}
                     {self ? " (you)" : ""}
                   </span>
-                  {u.mustChangePassword ? <span className="muted person-note">Temporary password</span> : null}
+                  {u.mustChangePassword ? <span className="muted person-note">Pending first sign-in</span> : null}
                 </td>
                 <td>
-                  <SelectField
-                    label={`Role for ${u.email}`}
-                    hideLabel
-                    className="role-select"
-                    value={u.role}
-                    disabled={lastAdmin || pending === u.id}
-                    hint={lastAdmin ? "The last admin cannot be removed or made a reviewer." : undefined}
-                    onChange={(e) => void changeRole(u, e.target.value === "admin" ? "admin" : "reviewer")}
-                  >
-                    <option value="reviewer">Reviewer</option>
-                    <option value="admin">Admin</option>
-                  </SelectField>
+                  {lastAdmin ? (
+                    <>
+                      <span>Admin</span>
+                      <span className="muted person-note">Only admin. Make someone else an admin first.</span>
+                    </>
+                  ) : (
+                    <SelectField
+                      label={`Role for ${u.email}`}
+                      hideLabel
+                      className="role-select"
+                      value={u.role}
+                      disabled={pending === u.id}
+                      onChange={(e) => {
+                        const role: Role = e.target.value === "admin" ? "admin" : "reviewer";
+                        if (role !== u.role) setRoleChange({ user: u, role });
+                      }}
+                    >
+                      <option value="reviewer">Reviewer</option>
+                      <option value="admin">Admin</option>
+                    </SelectField>
+                  )}
                 </td>
                 <td>{shortDate(u.createdAt)}</td>
                 <td className="actions">
@@ -106,6 +121,16 @@ export function PeopleTable({ users, currentUserId, onRoleChanged, onReset, onRe
           })}
         </tbody>
       </table>
+      {roleChange ? (
+        <ConfirmDialog
+          title={`Make ${roleChange.user.email} ${roleChange.role === "admin" ? "an admin" : "a reviewer"}?`}
+          body={roleBody(roleChange.user, roleChange.role)}
+          confirmLabel="Change role"
+          busyLabel="Changing…"
+          onConfirm={() => changeRole(roleChange.user, roleChange.role)}
+          onClose={() => setRoleChange(null)}
+        />
+      ) : null}
       {resetting ? (
         <ConfirmDialog
           title={`Reset the password for ${resetting.email}?`}

@@ -6,13 +6,16 @@ import { TextField } from "../components/TextField";
 import { useToast } from "../components/Toast";
 import { errorMessage } from "../lib/api";
 import * as api from "../lib/endpoints";
-import { shortDate } from "../lib/time";
+import { plural } from "../lib/format";
+import { relativeTime, shortDate } from "../lib/time";
 import type { Channel, Key } from "../lib/types";
 import { KeyTable } from "./KeyTable";
 
 interface ChannelPanelProps {
   channel: Channel;
   keys: Key[];
+  /** Feedback items on this channel, or null while unknown. */
+  itemCount?: number | null;
   /** How many channels exist; the last one cannot be deleted. */
   channelCount: number;
   onRenamed: (channel: Channel) => void;
@@ -27,9 +30,18 @@ export function deleteBody(activeKeys: number): string {
   return `Its ${noun} revoked immediately, so apps using them will start failing. Feedback already received is kept.`;
 }
 
+/** "312 items · last received 2 h ago", or "No feedback yet". Null when nothing is known (field absent, no count). */
+export function receivedLine(count: number | null, lastReceivedAt: string | null | undefined): string | null {
+  if (count === 0 || lastReceivedAt === null) return "No feedback yet";
+  if (lastReceivedAt === undefined) return count === null ? null : plural(count, "item", "items");
+  const items = count === null ? "" : `${plural(count, "item", "items")} · `;
+  return `${items}last received ${relativeTime(lastReceivedAt)}`;
+}
+
 export function ChannelPanel({
   channel,
   keys,
+  itemCount = null,
   channelCount,
   onRenamed,
   onDeleted,
@@ -54,6 +66,7 @@ export function ChannelPanel({
   useEffect(() => {
     if (headingTick > 0) heading.current?.focus();
   }, [headingTick]);
+  const line = receivedLine(itemCount, channel.lastReceivedAt);
   const activeKeys = keys.filter((k) => k.revokedAt === null).length;
 
   const startRename = () => {
@@ -134,19 +147,13 @@ export function ChannelPanel({
               <h2 id={headingId} ref={heading} tabIndex={-1} className="channel-name">
                 {channel.name}
               </h2>
+              {line !== null ? <span className="muted">{line}</span> : null}
               <span className="muted">created {shortDate(channel.createdAt)}</span>
             </div>
             <div className="channel-actions" hidden={renaming}>
               <Button ref={renameButton} variant="text" onClick={startRename}>
                 Rename
               </Button>
-              {channelCount > 1 ? (
-                <Button variant="danger" onClick={() => setDeleting(true)}>
-                  Delete channel
-                </Button>
-              ) : (
-                <span className="muted">The only channel cannot be deleted.</span>
-              )}
             </div>
         </>
       </div>
@@ -166,6 +173,16 @@ export function ChannelPanel({
         />
       ) : null}
       <KeyTable channelName={channel.name} keys={keys} onRevoke={setRevoking} />
+
+      <div className="channel-danger">
+        {channelCount > 1 ? (
+          <Button variant="danger" onClick={() => setDeleting(true)}>
+            Delete channel
+          </Button>
+        ) : (
+          <span className="muted">The only channel cannot be deleted.</span>
+        )}
+      </div>
 
       {deleting ? (
         <ConfirmDialog

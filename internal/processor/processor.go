@@ -26,6 +26,9 @@ import (
 // DefaultNakDelay is the base redelivery delay after a failed insert (§7).
 const DefaultNakDelay = time.Second
 
+// DefaultKeyTouchInterval is the least time between last_used_at writes for one key.
+const DefaultKeyTouchInterval = time.Minute
+
 const (
 	// drainTimeout bounds finishing an already fetched batch after shutdown.
 	drainTimeout      = 30 * time.Second
@@ -48,6 +51,9 @@ type Config struct {
 	// RetentionCheckInterval is how often retention runs; <= 0 disables it.
 	RetentionCheckInterval time.Duration
 	NakDelay               time.Duration // base for NakWithDelay (times NumDelivered)
+	// KeyTouchInterval is the least time between ingest key last_used_at
+	// writes for one key; <= 0 touches on every batch.
+	KeyTouchInterval time.Duration
 }
 
 // ConfigFrom takes the processor settings from cfg.
@@ -62,6 +68,7 @@ func ConfigFrom(cfg config.Config) Config {
 		RetentionWindow:        cfg.RetentionWindow,
 		RetentionCheckInterval: cfg.RetentionCheckInterval,
 		NakDelay:               DefaultNakDelay,
+		KeyTouchInterval:       DefaultKeyTouchInterval,
 	}
 }
 
@@ -72,6 +79,9 @@ type Processor struct {
 	cons jetstream.Consumer
 	cfg  Config
 	log  *slog.Logger
+
+	touchMu   sync.Mutex
+	lastTouch map[string]time.Time // key id -> wall time of its last successful touch
 }
 
 // New returns a Processor; call Run to start it.
@@ -79,7 +89,7 @@ func New(db *store.DB, js jetstream.JetStream, cons jetstream.Consumer, cfg Conf
 	if log == nil {
 		log = slog.Default()
 	}
-	p := &Processor{js: js, cons: cons, cfg: cfg, log: log}
+	p := &Processor{js: js, cons: cons, cfg: cfg, log: log, lastTouch: map[string]time.Time{}}
 	p.db.Store(db)
 	return p
 }
@@ -184,6 +194,7 @@ func (p *Processor) handle(ctx context.Context, msgs []jetstream.Msg) (wait time
 		}
 		p.log.Debug("batch handled", "fetched", len(msgs), "inserted", inserted,
 			"duplicates", len(good)-inserted, "dead", bad)
+		p.touchKeys(ctx, db, good)
 		return wait
 	}
 
@@ -193,10 +204,12 @@ func (p *Processor) handle(ctx context.Context, msgs []jetstream.Msg) (wait time
 	// failed statement aborts a Postgres transaction, so they cannot share one).
 	// After the first transient error the rest are not tried.
 	stored := 0
+	var storedItems []item
 	for _, it := range good {
 		if !down {
 			if _, rerr := p.insert(ctx, db, []item{it}); rerr == nil {
 				stored++
+				storedItems = append(storedItems, it)
 				logIf(p.log, "ack", it.msg.Ack())
 				continue
 			} else {
@@ -211,7 +224,49 @@ func (p *Processor) handle(ctx context.Context, msgs []jetstream.Msg) (wait time
 		}
 	}
 	p.log.Debug("batch handled per row", "fetched", len(msgs), "stored", stored, "dead", bad, "unreachable", down)
+	p.touchKeys(ctx, db, storedItems)
 	return wait
+}
+
+// touchKeys records last use of the ingest keys behind stored items. It runs
+// after the batch is committed and acked, outside the insert transaction, and
+// is best effort: a failure is logged at Debug and retried by a later batch.
+func (p *Processor) touchKeys(ctx context.Context, db *store.DB, stored []item) {
+	newest := map[string]store.KeyTouch{}
+	for _, it := range stored {
+		id := it.msg.Headers().Get(queue.HeaderKey)
+		if id == "" {
+			continue
+		}
+		if t, ok := newest[id]; !ok || it.row.ReceivedAt > t.At {
+			newest[id] = store.KeyTouch{TenantID: it.row.TenantID, KeyID: id, At: it.row.ReceivedAt}
+		}
+	}
+	if len(newest) == 0 {
+		return
+	}
+	now := time.Now()
+	var touches []store.KeyTouch
+	p.touchMu.Lock()
+	for id, t := range newest {
+		if last, ok := p.lastTouch[id]; ok && p.cfg.KeyTouchInterval > 0 && now.Sub(last) < p.cfg.KeyTouchInterval {
+			continue
+		}
+		touches = append(touches, t)
+	}
+	p.touchMu.Unlock()
+	if len(touches) == 0 {
+		return
+	}
+	if err := store.TouchIngestKeys(ctx, db.SQL, db.Dialect, touches); err != nil {
+		p.log.Debug("ingest key last-used update failed", "err", err)
+		return
+	}
+	p.touchMu.Lock()
+	for _, t := range touches {
+		p.lastTouch[t.KeyID] = now
+	}
+	p.touchMu.Unlock()
 }
 
 // nak asks for redelivery after the backoff for m's delivery count.

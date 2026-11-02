@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Kbd } from "./Kbd";
 import { XIcon } from "./icons";
 
 export type ToastKind = "success" | "info" | "error";
 
 export interface ToastOptions {
-  action?: { label: string; onAction: () => void };
+  action?: { label: string; onAction: () => void; /** A key that triggers the action, shown faintly beside the label. */ hint?: string };
   /** A toast with a key replaces any visible toast with the same key. */
   key?: string;
   /** Milliseconds; default 5000 (success, info), 8000 (error). */
@@ -151,12 +152,14 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
         <button
           type="button"
           className="toast-action"
+          {...(action.hint !== undefined ? { "aria-keyshortcuts": action.hint } : {})}
           onClick={() => {
             action.onAction();
             onDismiss(item.id);
           }}
         >
           {action.label}
+          {action.hint !== undefined ? <Kbd k={action.hint} /> : null}
         </button>
       ) : null}
       <button type="button" className="toast-dismiss" aria-label="Dismiss" onClick={() => onDismiss(item.id)}>

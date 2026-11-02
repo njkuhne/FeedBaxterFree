@@ -82,13 +82,9 @@ export default function Onboarding({ onReceived }: OnboardingProps) {
       </div>
       <ol className="steps">
         <li>
-          <p>Your Default channel has an ingest key. It was printed once in the server log at first boot:</p>
-          <CodeBlock code={LOG_COMMAND} label="Find the key in the log" />
-        </li>
-        <li>
           {admin ? (
             <>
-              <p>Lost it? Create a new key for the Default channel.</p>
+              <p>Create an ingest key for the Default channel.</p>
               {secret === null ? (
                 <Button variant="primary" loading={creating} loadingLabel="Creating…" onClick={() => void create()}>
                   Create a key
@@ -102,21 +98,22 @@ export default function Onboarding({ onReceived }: OnboardingProps) {
                   onDone={() => setShowSecret(false)}
                 />
               ) : null}
+              <p className="muted">Or use the key printed in the server log at first boot:</p>
+              <CodeBlock code={LOG_COMMAND} label="Find the key in the log" />
             </>
           ) : (
-            <p>Ask an admin for the ingest key.</p>
+            <p>Ask an admin for an ingest key.</p>
           )}
         </li>
         <li>
-          <p>Then send a test message:</p>
+          <p>Send a test message:</p>
           <CodeBlock code={curlCommand(window.location.origin, secret ?? "fbx_your_key")} label="First API call" />
         </li>
       </ol>
-      <section className="section">
-        <h2 className="section-title">Web SDK</h2>
-        <p className="soft">The Web SDK is not released yet. Until it is, call the API as shown above from your app.</p>
-      </section>
-      <p className="muted">This page switches to the inbox when the first feedback arrives.</p>
+      <p role="status" className="waiting">
+        <span className="waiting-dot" aria-hidden="true"></span>
+        Waiting for your first feedback…
+      </p>
     </>
   );
 }

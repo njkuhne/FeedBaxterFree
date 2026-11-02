@@ -138,3 +138,33 @@
   margin-top: var(--s-4);
   font-size: var(--fs-meta);
 }
+
+/* Delete channel sits apart from Rename: its own row at the end of the panel */
+.channel-danger {
+  display: flex;
+  align-items: center;
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: var(--border-hairline);
+}
+
+.ops-cell dd .icon {
+  margin-right: var(--s-2);
+  vertical-align: -2px;
+}
+
+.ops-version {
+  margin-top: var(--s-4);
+}
+
+.new-channel {
+  margin-bottom: var(--s-4);
+}
+
+.mcp-config {
+  margin: var(--s-4) 0;
+}
+
+.mcp-config > * + * {
+  margin-top: var(--s-3);
+}

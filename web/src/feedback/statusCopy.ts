@@ -1,3 +1,4 @@
+import { getPrefs } from "../lib/prefs";
 import type { Status } from "../lib/types";
 
 /** Text actions for each target status. */
@@ -23,9 +24,9 @@ export function markedToast(count: number, status: Status): string {
   return `Marked ${count} ${status}`;
 }
 
-/** Appended to the screen reader announcement of a status change. */
+/** Appended to the screen reader announcement of a status change; left out when single keys are off. */
 export function withUndoHint(sentence: string): string {
-  return `${sentence} Press z to undo.`;
+  return getPrefs().singleKeys ? `${sentence} Press z to undo.` : sentence;
 }
 
 /** Detail page: "Marked as reviewed." */

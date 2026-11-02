@@ -313,8 +313,8 @@ func TestRunRejectsBadMode(t *testing.T) {
 func TestMigrateSQLite(t *testing.T) {
 	isolate(t)
 	got, err := Migrate(context.Background(), Options{})
-	if err != nil || !reflect.DeepEqual(got, []string{"0001_core", "0002_triage"}) {
-		t.Fatalf("first Migrate = %v, %v; want [0001_core 0002_triage]", got, err)
+	if err != nil || !reflect.DeepEqual(got, []string{"0001_core", "0002_triage", "0003_key_last_used"}) {
+		t.Fatalf("first Migrate = %v, %v; want [0001_core 0002_triage 0003_key_last_used]", got, err)
 	}
 	got, err = Migrate(context.Background(), Options{})
 	if err != nil || len(got) != 0 {
@@ -330,8 +330,8 @@ func TestMigrateWithExtension(t *testing.T) {
 		Postgres: "CREATE TABLE ext_demo (id BIGINT PRIMARY KEY)",
 	}
 	got, err := Migrate(context.Background(), Options{Migrations: []ext.Migration{m}})
-	if err != nil || !reflect.DeepEqual(got, []string{"0001_core", "0002_triage", "ext_0001_demo"}) {
-		t.Fatalf("Migrate = %v, %v; want [0001_core 0002_triage ext_0001_demo]", got, err)
+	if err != nil || !reflect.DeepEqual(got, []string{"0001_core", "0002_triage", "0003_key_last_used", "ext_0001_demo"}) {
+		t.Fatalf("Migrate = %v, %v; want [0001_core 0002_triage 0003_key_last_used ext_0001_demo]", got, err)
 	}
 }
 
