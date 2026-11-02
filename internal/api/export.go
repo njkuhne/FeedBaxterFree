@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/njkuhne/feedbaxterfree/ext"
+	"github.com/njkuhne/feedbaxterfree/internal/service"
 	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
@@ -42,6 +43,51 @@ func csvRecord(f store.Feedback) []string {
 	}
 }
 
+// exportFilename names the download: feedbaxter-<status>[-<tag>]-<date>.<format>.
+// Channel, search and user filters stay out of the name (they can hold
+// personal or long text).
+func exportFilename(f service.Filter, format string, now time.Time) string {
+	name := "feedbaxter-"
+	var sts []string
+	for _, st := range f.Statuses {
+		if s := slugTag(st); s != "" { // statuses are checked later; keep the header safe
+			sts = append(sts, s)
+		}
+	}
+	if len(sts) == 0 {
+		name += "all"
+	} else {
+		name += strings.Join(sts, "-")
+	}
+	if t := slugTag(f.Tag); t != "" {
+		name += "-" + t
+	}
+	return name + "-" + now.UTC().Format("2006-01-02") + "." + format
+}
+
+// slugTag lowercases tag, turns every run of characters outside [a-z0-9] into
+// one "-", trims "-" from both ends and cuts the result to 40 characters.
+func slugTag(tag string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(tag) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			if dash && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			dash = false
+			b.WriteRune(r)
+		} else {
+			dash = true
+		}
+	}
+	s := b.String()
+	if len(s) > 40 {
+		s = s[:40]
+	}
+	return strings.TrimRight(s, "-")
+}
+
 // exportFeedback streams every matching item. Format and filters are checked
 // before any header is written; headers go out with the first row (or at the
 // end when nothing matched), so an error in the first page is still a proper
@@ -68,7 +114,7 @@ func (a *api) exportFeedback(w http.ResponseWriter, r *http.Request, p ext.Princ
 		} else {
 			h.Set("Content-Type", "application/json")
 		}
-		h.Set("Content-Disposition", `attachment; filename="feedback-`+time.Now().UTC().Format("20060102")+"."+format+`"`)
+		h.Set("Content-Disposition", `attachment; filename="`+exportFilename(f, format, time.Now())+`"`)
 		w.WriteHeader(http.StatusOK)
 		started = true
 		if format == "csv" {

@@ -5,6 +5,7 @@ import { vi } from "vitest";
 import { AnnouncerProvider } from "../components/Announcer";
 import { ToastProvider } from "../components/Toast";
 import type { Feedback } from "../lib/types";
+import { ShortcutsProvider } from "./shortcuts";
 import { UndoProvider } from "./undo";
 
 export function fb(over: Partial<Feedback> & { id: string }): Feedback {
@@ -67,9 +68,11 @@ export function renderPage(ui: ReactElement, opts: { at?: string; route?: string
       <AnnouncerProvider>
         <MemoryRouter initialEntries={[opts.at ?? "/"]}>
           <UndoProvider>
-            <Routes>
-              <Route path={opts.route ?? "*"} element={ui} />
-            </Routes>
+            <ShortcutsProvider>
+              <Routes>
+                <Route path={opts.route ?? "*"} element={ui} />
+              </Routes>
+            </ShortcutsProvider>
           </UndoProvider>
         </MemoryRouter>
       </AnnouncerProvider>
@@ -98,14 +101,24 @@ export function renderRoutes(entries: HistoryEntry[], routes: { path: string; el
       <AnnouncerProvider>
         <MemoryRouter initialEntries={initial} initialIndex={initial.length - 1}>
           <UndoProvider>
-            <Routes>
-              {routes.map((r) => (
-                <Route key={r.path} path={r.path} element={r.element} />
-              ))}
-            </Routes>
+            <ShortcutsProvider>
+              <Routes>
+                {routes.map((r) => (
+                  <Route key={r.path} path={r.path} element={r.element} />
+                ))}
+              </Routes>
+            </ShortcutsProvider>
           </UndoProvider>
         </MemoryRouter>
       </AnnouncerProvider>
     </ToastProvider>,
   );
+}
+
+/** An element's visible label without its key hint (the hint is aria-hidden). */
+export function labelOf(el: Element | null | undefined): string | undefined {
+  if (!el) return undefined;
+  const copy = el.cloneNode(true) as Element;
+  for (const k of Array.from(copy.querySelectorAll(".kbd-hint"))) k.remove();
+  return copy.textContent ?? undefined;
 }

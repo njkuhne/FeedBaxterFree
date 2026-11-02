@@ -7,8 +7,8 @@ import type { Ops } from "../lib/types";
 import { usePageTitle } from "../shell/usePageTitle";
 import "../styles/admin.css";
 
-export default function Settings() {
-  usePageTitle("Settings");
+export default function System() {
+  usePageTitle("System");
   const [ops, setOps] = useState<Ops | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -27,7 +27,7 @@ export default function Settings() {
 
   return (
     <>
-      <PageTitle>Settings</PageTitle>
+      <PageTitle>System</PageTitle>
       <section aria-labelledby="ops-h">
         <h2 id="ops-h" className="section-title">
           Operations

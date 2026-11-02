@@ -85,6 +85,32 @@
   box-shadow: inset 3px 0 0 var(--dusk-deep);
 }
 
+/* ink muted is 4.8:1 on paper but 4.2:1 on the current and hover fills, so there it is ink soft (6.1:1) */
+.rail-link .nav-count {
+  margin-left: var(--s-2);
+  color: var(--ink-muted);
+  font-size: var(--fs-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-link:hover .nav-count,
+.rail-link[aria-current="page"] .nav-count {
+  color: var(--ink-soft);
+}
+
+/* Profile, Keyboard shortcuts and Sign out: one group of quiet text links on the email's left edge */
+.rail-account .btn {
+  justify-content: flex-start;
+  padding-left: 0;
+}
+
+.rail-account .btn[aria-current="page"] {
+  color: var(--ink);
+  font-weight: var(--fw-medium);
+  text-decoration-color: var(--dusk-deep);
+  text-decoration-thickness: 2px;
+}
+
 .rail-account {
   display: flex;
   flex-direction: column;

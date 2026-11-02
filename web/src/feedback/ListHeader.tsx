@@ -114,6 +114,7 @@ export function ListHeader({
             onRemoveTag={onRemoveTag}
             onClear={onClear}
             hideClear={narrow}
+            narrow={narrow}
           />
         ) : narrow && selectMode ? (
           <span className="list-hint">Select items</span>

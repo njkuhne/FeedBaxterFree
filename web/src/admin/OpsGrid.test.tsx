@@ -23,7 +23,6 @@ describe("OpsGrid", () => {
       "Accepted today",
       "Accepted this month",
       "Database size",
-      "Version",
     ]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
@@ -31,7 +30,8 @@ describe("OpsGrid", () => {
     expect(screen.getByText("21,200")).toBeTruthy();
     expect(screen.getByText("None")).toBeTruthy();
     expect(screen.getByText("1.0 MB")).toBeTruthy();
-    expect(screen.getByText("0.2.0 · all mode · SQLite")).toBeTruthy();
+    expect(screen.queryByText("Version")).toBeNull();
+    expect(screen.getByText("FeedBaxter 0.2.0 · single process · SQLite")).toBeTruthy();
     expect(screen.getByText(/Updated 10:31:05\. Refreshes every 10 seconds\./)).toBeTruthy();
     expect(screen.queryByText(/Signals/)).toBeNull();
     expect(screen.queryByText(/Processing is behind/)).toBeNull();
@@ -47,14 +47,16 @@ describe("OpsGrid", () => {
       />,
     );
     expect(screen.getByText("2 min 5 s")).toBeTruthy();
-    expect(screen.getByText("0.2.0 · all mode · Postgres")).toBeTruthy();
+    expect(screen.getByText("FeedBaxter 0.2.0 · single process · Postgres")).toBeTruthy();
   });
 
   it("notes a dead-letter count", () => {
     render(
       <OpsGrid ops={{ ...base, queue: { depth: 0, oldestAgeSeconds: 0, dlq: 2 } }} unavailable={false} updatedAt={at} onRefresh={() => undefined} />,
     );
-    expect(screen.getByText('Some submissions could not be stored. See "Signals" in OPS.md.')).toBeTruthy();
+    expect(
+      screen.getByText('2 submissions could not be stored. They are kept aside; see "Signals" in OPS.md to inspect and replay them.'),
+    ).toBeTruthy();
   });
 
   it("notes when processing is behind", () => {

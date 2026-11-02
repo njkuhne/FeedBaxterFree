@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Feedback, Filters } from "../lib/types";
@@ -337,7 +337,7 @@ describe("FeedbackList", () => {
     expect(calls.filter((c) => c.method === "GET" && c.path.includes("limit=200"))).toHaveLength(3);
   });
 
-  it("relative times refresh", async () => {
+  it("relative times refresh after a minute", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
     try {
       vi.setSystemTime(new Date("2026-03-01T10:00:00.000Z"));
@@ -505,3 +505,144 @@ describe("FeedbackList on a narrow screen", () => {
     expect(screen.queryByRole("button", { name: /matching/ })).toBeNull();
   });
 });
+
+describe("FeedbackList keyboard additions", () => {
+  const checked = () =>
+    Array.from(document.querySelectorAll<HTMLInputElement>('.rows input[type="checkbox"]')).map((c) => c.checked);
+
+  it("Shift+j selects the current and the next row", async () => {
+    api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    fireEvent.keyDown(third, { key: "J" });
+    await waitFor(() => expect(document.activeElement).toBe(link("Second")));
+    expect(checked()).toEqual([true, true, false]);
+    fireEvent.keyDown(link("Second"), { key: "J" });
+    await waitFor(() => expect(document.activeElement).toBe(link("First")));
+    expect(checked()).toEqual([true, true, true]);
+    expect(await screen.findByText("3 selected")).toBeTruthy();
+  });
+
+  it("Shift+k selects upwards", async () => {
+    api();
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    fireEvent.keyDown(link("Third"), { key: "j" });
+    await waitFor(() => expect(document.activeElement).toBe(link("Second")));
+    fireEvent.keyDown(link("Second"), { key: "j" });
+    await waitFor(() => expect(document.activeElement).toBe(link("First")));
+    fireEvent.keyDown(link("First"), { key: "K" });
+    await waitFor(() => expect(document.activeElement).toBe(link("Second")));
+    expect(checked()).toEqual([false, true, true]);
+    fireEvent.keyDown(link("Second"), { key: "K" });
+    await waitFor(() => expect(document.activeElement).toBe(link("Third")));
+    expect(checked()).toEqual([true, true, true]);
+  });
+
+  it("status buttons in the bulk bar show key hints", async () => {
+    api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    third.focus();
+    fireEvent.keyDown(third, { key: "x" });
+    const bar = await screen.findByRole("toolbar", { name: "Bulk actions" });
+    const reviewed = within(bar).getByRole("button", { name: "Mark reviewed" });
+    expect(reviewed.getAttribute("aria-keyshortcuts")).toBe("e");
+    expect(reviewed.querySelector(".kbd-hint")?.textContent).toBe("e");
+    expect(reviewed.querySelector(".kbd-hint")?.getAttribute("aria-hidden")).toBe("true");
+    const keys = Array.from(bar.querySelectorAll(".kbd-hint")).map((k) => k.textContent);
+    expect(keys).toEqual(["e", "a", "i"]);
+  });
+
+  it("key hints are hidden when single keys are off", async () => {
+    window.localStorage.setItem("fbx.pref.singleKeys", "0");
+    api();
+    setup();
+    const third = await screen.findByRole("link", { name: "Third" });
+    const box = third.closest("li")?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    fireEvent.click(box as HTMLInputElement);
+    const bar = await screen.findByRole("toolbar", { name: "Bulk actions" });
+    expect(bar.querySelectorAll(".kbd-hint")).toHaveLength(0);
+    expect(bar.querySelectorAll("[aria-keyshortcuts]")).toHaveLength(0);
+  });
+
+  it("no shortcuts link below the rows", async () => {
+    api();
+    setup();
+    await screen.findByRole("link", { name: "Third" });
+    expect(screen.queryByRole("button", { name: "Keyboard shortcuts" })).toBeNull();
+    expect(screen.queryByText("Keyboard shortcuts")).toBeNull();
+  });
+});
+
+describe("FeedbackList paging", () => {
+  const page = (from: number, n: number) =>
+    Array.from({ length: n }, (_, i) => fb({ id: `fb_${from + i}`, message: `Row ${from + i}`, receivedAt: `2026-03-01T09:${String(59 - ((from + i) % 60)).padStart(2, "0")}:00.000Z` }));
+
+  function paged() {
+    return mockApi((c) => {
+      if (c.method === "GET" && c.path.startsWith("/api/feedback")) {
+        const more = c.path.includes("cursor=");
+        return { body: more ? { items: page(50, 10), nextCursor: null } : { items: page(0, 50), nextCursor: "c1" } };
+      }
+      return undefined;
+    });
+  }
+
+  function renderWithCount(count: number | null) {
+    return renderPage(
+      <FeedbackList filters={filters} showChannel={false} origin="inbox" originLabel="Inbox" count={count} renderEmpty={() => <p>Nothing here</p>} />,
+    );
+  }
+
+  it("says Showing 50 of 312 when more pages exist", async () => {
+    paged();
+    renderWithCount(312);
+    await screen.findByRole("link", { name: "Row 0" });
+    expect(screen.getByText("Showing 50 of 312")).toBeTruthy();
+  });
+
+  it("says Showing 50 when the total is unknown", async () => {
+    paged();
+    renderWithCount(null);
+    await screen.findByRole("link", { name: "Row 0" });
+    expect(screen.getByText("Showing 50")).toBeTruthy();
+  });
+
+  it("auto-loads the next page when the end scrolls into view", async () => {
+    const observers: { cb: IntersectionObserverCallback; opts: IntersectionObserverInit | undefined }[] = [];
+    class FakeObserver {
+      constructor(cb: IntersectionObserverCallback, opts?: IntersectionObserverInit) {
+        observers.push({ cb, opts });
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+      takeRecords() {
+        return [];
+      }
+    }
+    vi.stubGlobal("IntersectionObserver", FakeObserver);
+    const { calls } = paged();
+    renderWithCount(60);
+    await screen.findByRole("link", { name: "Row 0" });
+    const obs = observers[observers.length - 1];
+    expect(obs?.opts?.rootMargin).toBe("0px 0px 400px 0px");
+    act(() => obs?.cb([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+    await screen.findByRole("link", { name: "Row 59" });
+    expect(calls.filter((c) => c.path.includes("cursor=c1"))).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+  });
+
+  it("keeps the Load more button as a fallback", async () => {
+    // jsdom has no IntersectionObserver: nothing loads by itself.
+    const { calls } = paged();
+    renderWithCount(60);
+    await screen.findByRole("link", { name: "Row 0" });
+    expect(calls.some((c) => c.path.includes("cursor="))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByRole("link", { name: "Row 59" });
+  });
+});
+

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlineAlert } from "../components/InlineAlert";
+import { McpConfig } from "../admin/McpConfig";
 import { PageTitle } from "../components/PageTitle";
 import { SecretOnce } from "../components/SecretOnce";
 import { TextField } from "../components/TextField";
@@ -194,12 +195,15 @@ function TokensSection() {
         </Button>
       </form>
       {secret !== null ? (
-        <SecretOnce
-          title="Copy this token now"
-          value={secret}
-          note="It is shown only once. Only a hash is stored."
-          onDone={() => setSecret(null)}
-        />
+        <>
+          <SecretOnce
+            title="Copy this token now"
+            value={secret}
+            note="It is shown only once. Only a hash is stored."
+            onDone={() => setSecret(null)}
+          />
+          <McpConfig secret={secret} />
+        </>
       ) : null}
       {loadError ? (
         <InlineAlert onRetry={load}>Could not load tokens. {loadError}</InlineAlert>

@@ -1,6 +1,7 @@
-import { createBrowserRouter, Outlet } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { AnnouncerProvider } from "./components/Announcer";
 import { ToastProvider } from "./components/Toast";
+import { AppShortcuts } from "./feedback/shortcuts";
 import { UndoProvider } from "./feedback/undo";
 import { AuthProvider } from "./shell/AuthProvider";
 import { AdminOnly, RequireAuth } from "./shell/Shell";
@@ -13,7 +14,7 @@ import NotFound from "./pages/NotFound";
 import People from "./pages/People";
 import PerUser from "./pages/PerUser";
 import Profile from "./pages/Profile";
-import Settings from "./pages/Settings";
+import System from "./pages/System";
 
 function Providers() {
   return (
@@ -21,7 +22,9 @@ function Providers() {
       <AnnouncerProvider>
         <UndoProvider>
           <AuthProvider>
-            <Outlet />
+            <AppShortcuts>
+              <Outlet />
+            </AppShortcuts>
           </AuthProvider>
         </UndoProvider>
       </AnnouncerProvider>
@@ -43,7 +46,8 @@ export const routes = [
           { path: "/user/:userId", element: <PerUser /> },
           { path: "/channels", element: <AdminOnly><Channels /></AdminOnly> },
           { path: "/people", element: <AdminOnly><People /></AdminOnly> },
-          { path: "/settings", element: <AdminOnly><Settings /></AdminOnly> },
+          { path: "/system", element: <AdminOnly><System /></AdminOnly> },
+          { path: "/settings", element: <AdminOnly><Navigate to="/system" replace /></AdminOnly> },
           { path: "/profile", element: <Profile /> },
           { path: "*", element: <NotFound /> },
         ],

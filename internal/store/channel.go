@@ -11,6 +11,7 @@ import (
 type Channel struct {
 	ID, TenantID, Name string
 	CreatedAt          int64
+	LastReceivedAt     *int64 // received_at of the newest feedback; filled by ListChannels only
 }
 
 // CreateChannel inserts a channel; the name must be unique within the tenant.
@@ -48,7 +49,9 @@ func GetChannel(ctx context.Context, q Querier, d Dialect, tenantID, id string) 
 // ListChannels returns the tenant's channels ordered by created_at, id.
 func ListChannels(ctx context.Context, q Querier, d Dialect, tenantID string) ([]Channel, error) {
 	rows, err := q.QueryContext(ctx, d.Rebind(
-		"SELECT "+channelCols+" FROM channels WHERE tenant_id = ? ORDER BY created_at, id"), tenantID)
+		"SELECT c.id, c.tenant_id, c.name, c.created_at, "+
+			"(SELECT MAX(f.received_at) FROM feedback f WHERE f.tenant_id = c.tenant_id AND f.channel_id = c.id) "+
+			"FROM channels c WHERE c.tenant_id = ? ORDER BY c.created_at, c.id"), tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list channels: %w", err)
 	}
@@ -56,7 +59,7 @@ func ListChannels(ctx context.Context, q Querier, d Dialect, tenantID string) ([
 	var out []Channel
 	for rows.Next() {
 		var c Channel
-		if err := rows.Scan(&c.ID, &c.TenantID, &c.Name, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.TenantID, &c.Name, &c.CreatedAt, &c.LastReceivedAt); err != nil {
 			return nil, fmt.Errorf("store: list channels: %w", err)
 		}
 		out = append(out, c)

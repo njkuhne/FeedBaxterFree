@@ -104,10 +104,12 @@ type channelJSON struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	CreatedAt string `json:"createdAt"`
+	// LastReceivedAt is the newest feedback's time; null when the channel has none.
+	LastReceivedAt *string `json:"lastReceivedAt"`
 }
 
 func newChannelJSON(c store.Channel) channelJSON {
-	return channelJSON{ID: c.ID, Name: c.Name, CreatedAt: fmtMs(c.CreatedAt)}
+	return channelJSON{ID: c.ID, Name: c.Name, CreatedAt: fmtMs(c.CreatedAt), LastReceivedAt: fmtMsPtr(c.LastReceivedAt)}
 }
 
 type keyJSON struct {
@@ -116,10 +118,12 @@ type keyJSON struct {
 	Prefix    string  `json:"prefix"`
 	CreatedAt string  `json:"createdAt"`
 	RevokedAt *string `json:"revokedAt"`
+	// LastUsedAt is when the key last sent stored feedback; null until first use.
+	LastUsedAt *string `json:"lastUsedAt"`
 }
 
 func newKeyJSON(k store.IngestKey) keyJSON {
-	return keyJSON{ID: k.ID, ChannelID: k.ChannelID, Prefix: k.Prefix, CreatedAt: fmtMs(k.CreatedAt), RevokedAt: fmtMsPtr(k.RevokedAt)}
+	return keyJSON{ID: k.ID, ChannelID: k.ChannelID, Prefix: k.Prefix, CreatedAt: fmtMs(k.CreatedAt), RevokedAt: fmtMsPtr(k.RevokedAt), LastUsedAt: fmtMsPtr(k.LastUsedAt)}
 }
 
 type feedbackJSON struct {

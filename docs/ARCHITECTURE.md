@@ -164,6 +164,8 @@ Loop per worker goroutine (`WORKER_CONCURRENCY`, default 1 for SQLite, 4 for Pos
    - **Rejected row** (database reachable, the row itself fails): retry each row of the batch in its own transaction so one poison row does not drag the batch down; a row with `NumDelivered >= QUEUE_MAX_DELIVER` is dead-lettered and acked, otherwise `Nak` with the same backoff but without pausing the worker.
    - A failed DLQ publish is infrastructure trouble: `Nak` with backoff and pause; never ack or term.
 
+After the ack the processor also records ingest key last use (`ingest_keys.last_used_at`, set to the newest `FB-Received` among the batch's stored messages for each `FB-Key`): best effort, at most once per `KeyTouchInterval` (default 1 min) per key, outside the insert transaction, so ingest stays write-free and a failure never affects feedback.
+
 Retention: a jittered ticker (`RETENTION_CHECK_INTERVAL`, default `1h`) in every worker deletes rows older than `RETENTION_WINDOW` (default `17520h`, 2 years) in batches of 1000 per transaction until none remain.
 
 ## 8. Store

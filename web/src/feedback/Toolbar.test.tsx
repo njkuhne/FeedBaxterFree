@@ -70,9 +70,14 @@ describe("Toolbar", () => {
     fireEvent.click(button);
     expect(button.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText('Export 17 items · New, tag bug, matching "safari"')).toBeTruthy();
-    const csv = screen.getByRole("link", { name: "CSV" });
-    expect(csv.getAttribute("href")).toContain("format=csv");
-    expect(csv.getAttribute("href")).toContain("tag=bug");
+    // CSV is a button that fetches the export (it was a link): the request carries the filters.
+    const fetchMock = vi.fn(() => new Promise<Response>(() => undefined));
+    vi.stubGlobal("fetch", fetchMock);
+    fireEvent.click(screen.getByRole("button", { name: "CSV" }));
+    const first = fetchMock.mock.calls[0] as unknown as [string] | undefined;
+    expect(first?.[0]).toContain("format=csv");
+    expect(first?.[0]).toContain("tag=bug");
+    vi.unstubAllGlobals();
     fireEvent.keyDown(button, { key: "Escape" });
     expect(button.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(button);
@@ -126,8 +131,8 @@ describe("Toolbar", () => {
       expect(l?.className).toBe("field-label");
     }
     expect(panel.textContent).toContain("Export 17 items \u00b7 New, tag bug");
-    expect(screen.getByRole("link", { name: "CSV" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "JSON" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "CSV" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "JSON" })).toBeTruthy();
   });
 
   it("desktop toolbar is unchanged", () => {

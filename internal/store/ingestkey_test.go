@@ -148,3 +148,63 @@ func TestListIngestKeysForCache(t *testing.T) {
 		}
 	})
 }
+
+func lastUsed(t *testing.T, db *store.DB, tenantID, id string) *int64 {
+	t.Helper()
+	k, err := store.GetIngestKey(context.Background(), db.SQL, db.Dialect, tenantID, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k.LastUsedAt
+}
+
+func TestTouchIngestKeysSetsAndNeverGoesBack(t *testing.T) {
+	storetest.ForEachDialect(t, func(t *testing.T, db *store.DB) {
+		ctx, d := context.Background(), db.Dialect
+		tn, ch := newTenant(t, db, "acme")
+		k, err := store.CreateIngestKey(ctx, db.SQL, d, tn.ID, ch.ID, store.GenerateIngestKey(), 500)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := lastUsed(t, db, tn.ID, k.ID); got != nil {
+			t.Fatalf("before = %d", *got)
+		}
+		touch := func(at int64) {
+			t.Helper()
+			if err := store.TouchIngestKeys(ctx, db.SQL, d, []store.KeyTouch{{TenantID: tn.ID, KeyID: k.ID, At: at}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, step := range []struct{ at, want int64 }{{1000, 1000}, {900, 1000}, {1000, 1000}, {2000, 2000}} {
+			touch(step.at)
+			if got := lastUsed(t, db, tn.ID, k.ID); got == nil || *got != step.want {
+				t.Fatalf("after touch %d: %v, want %d", step.at, got, step.want)
+			}
+		}
+		if err := store.TouchIngestKeys(ctx, db.SQL, d, nil); err != nil {
+			t.Errorf("empty touch: %v", err)
+		}
+	})
+}
+
+func TestTouchIngestKeysIgnoresOtherTenantAndUnknownKey(t *testing.T) {
+	storetest.ForEachDialect(t, func(t *testing.T, db *store.DB) {
+		ctx, d := context.Background(), db.Dialect
+		tn, ch := newTenant(t, db, "acme")
+		other, _ := newTenant(t, db, "other")
+		k, err := store.CreateIngestKey(ctx, db.SQL, d, tn.ID, ch.ID, store.GenerateIngestKey(), 500)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = store.TouchIngestKeys(ctx, db.SQL, d, []store.KeyTouch{
+			{TenantID: other.ID, KeyID: k.ID, At: 1000},
+			{TenantID: tn.ID, KeyID: "ky_missing", At: 1000},
+		})
+		if err != nil {
+			t.Fatalf("unknown keys must be ignored: %v", err)
+		}
+		if got := lastUsed(t, db, tn.ID, k.ID); got != nil {
+			t.Errorf("other tenant's touch changed the key: %d", *got)
+		}
+	})
+}

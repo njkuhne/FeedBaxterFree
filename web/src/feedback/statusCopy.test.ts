@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { setPref } from "../lib/prefs";
 import { ACTION_LABEL, addedTagSentence, markedOneSentence, markedSentence, markedToast, validTag, withUndoHint } from "./statusCopy";
 
 describe("statusCopy", () => {
@@ -31,5 +32,11 @@ describe("statusCopy", () => {
     expect(validTag("   ")).toBeNull();
     expect(validTag("x".repeat(65))).toBeNull();
     expect(validTag("x".repeat(64))).toBe("x".repeat(64));
+  });
+
+  it("the undo announcement drops the z hint when single keys are off", () => {
+    expect(withUndoHint("Marked 1 as reviewed.")).toBe("Marked 1 as reviewed. Press z to undo.");
+    setPref("singleKeys", false);
+    expect(withUndoHint("Marked 1 as reviewed.")).toBe("Marked 1 as reviewed.");
   });
 });

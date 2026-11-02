@@ -150,4 +150,27 @@ describe("Toast options", () => {
     expect(screen.queryByText("Marked 1 reviewed")).toBeNull();
     expect(log).toEqual(["close"]);
   });
+
+  it("an action with a hint shows the key and sets aria-keyshortcuts", () => {
+    render(
+      <ToastProvider>
+        <HintTrigger />
+      </ToastProvider>,
+    );
+    fireEvent.click(screen.getByText("withHint"));
+    const action = screen.getByRole("button", { name: "Undo" });
+    expect(action.getAttribute("aria-keyshortcuts")).toBe("z");
+    const hint = action.querySelector("kbd");
+    expect(hint?.textContent).toBe("z");
+    expect(hint?.getAttribute("aria-hidden")).toBe("true");
+  });
 });
+
+function HintTrigger() {
+  const toast = useToast();
+  return (
+    <button onClick={() => toast.show("Marked 1 reviewed", "success", { action: { label: "Undo", onAction: () => undefined, hint: "z" } })}>
+      withHint
+    </button>
+  );
+}

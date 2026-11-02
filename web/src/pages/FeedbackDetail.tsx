@@ -9,7 +9,7 @@ import { InlineAlert } from "../components/InlineAlert";
 import { MetaItem, MetaList } from "../components/MetaList";
 import { PageTitle } from "../components/PageTitle";
 import { StatusChip } from "../components/StatusChip";
-import { STATUS_LABEL } from "../components/StatusMarker";
+import { Kbd } from "../components/Kbd";
 import { Highlight } from "../components/Highlight";
 import { useToast } from "../components/Toast";
 import { ApiError, errorMessage } from "../lib/api";
@@ -24,7 +24,9 @@ import {
   setStatus,
   stats as fetchStats,
 } from "../lib/endpoints";
-import { matchesFilters } from "../lib/filters";
+import { copyText } from "../lib/clipboard";
+import { defaultFilters, matchesFilters } from "../lib/filters";
+import { getPrefs, usePrefs } from "../lib/prefs";
 import { useNarrow } from "../lib/useMediaQuery";
 import { shortcutFor, type KeyLike, type ShortcutAction } from "../lib/shortcuts";
 import { platformName } from "../lib/format";
@@ -32,6 +34,8 @@ import { absoluteTime, relativeTime } from "../lib/time";
 import type { Feedback, HistoryEntry, Json, Status, TagCount } from "../lib/types";
 import "../styles/feedback.css";
 import { appendPage, applyFeedback, getList, removeFeedback, setFocus, subscribe } from "../feedback/listStore";
+import { historyLead, historyTime } from "../feedback/historyCopy";
+import { STATUS_KEY } from "../feedback/BulkBar";
 import { positionLabel, readFrom } from "../feedback/origin";
 import { ACTION_LABEL, ACTION_ORDER, markedOneSentence, markedToast, withUndoHint } from "../feedback/statusCopy";
 import { TagEditor, type TagEditorHandle } from "../feedback/TagEditor";
@@ -50,8 +54,17 @@ type Load =
   | { id: string; phase: "error"; message: string }
   | { id: string; phase: "ready"; item: View };
 
-function metaValue(v: Json): string {
-  return typeof v === "string" ? v : JSON.stringify(v);
+/** One metadata value as plain text: strings as they are, structures pretty-printed. Never HTML. */
+function MetaValue({ value }: { value: Json }) {
+  if (typeof value === "string") return <dd className="meta-text">{value}</dd>;
+  if (typeof value === "object" && value !== null) {
+    return (
+      <dd>
+        <pre className="meta-json">{JSON.stringify(value, null, 2)}</pre>
+      </dd>
+    );
+  }
+  return <dd>{String(value)}</dd>;
 }
 
 function keyLike(e: KeyboardEvent): KeyLike {
@@ -96,6 +109,8 @@ export default function FeedbackDetail() {
   const [paging, setPaging] = useState(false);
   const [advancing, setAdvancing] = useState<string | null>(null);
   const [storeTick, setStoreTick] = useState(0);
+  const [others, setOthers] = useState<{ userId: string; n: number } | null>(null);
+  const prefs = usePrefs();
   const [statTotal, setStatTotal] = useState<{ key: string; n: number } | null>(null);
   const listId = useId();
   const idRef = useRef(id);
@@ -176,6 +191,21 @@ export default function FeedbackDetail() {
     // The list object changes on every store event, which is exactly when to ask again.
   }, [partial, fromKey, storeTick]);
 
+  // How many other items this user has: once per item.
+  const ownerId = view?.userId ?? null;
+  useEffect(() => {
+    if (ownerId === null) return;
+    let live = true;
+    fetchStats({ ...defaultFilters, status: "all", userId: ownerId })
+      .then((s) => {
+        if (live) setOthers({ userId: ownerId, n: s.total - 1 });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [id, ownerId]);
+
   const go = (target: string) => navigate(detailPath(target), { replace: true, state: { from } });
 
   const goBack = (focusId: string | null = id) => {
@@ -221,7 +251,8 @@ export default function FeedbackDetail() {
         announce(withUndoHint(markedOneSentence(next)));
         const message = markedToast(1, next);
         const left = from !== null && index >= 0 && !matchesFilters(updated, from.filters);
-        if (from === null || !left) {
+        // With auto-advance off, a decision that takes the item out of its list keeps you on the item.
+        if (from === null || !left || !getPrefs().advance) {
           undo.offer({ message, before: [snapshot] });
           await fetchItem();
           return true;
@@ -298,7 +329,7 @@ export default function FeedbackDetail() {
     if (!hasView) return;
     const onKey = (e: KeyboardEvent) => {
       const open = document.querySelector('[aria-modal="true"]') !== null;
-      const action = shortcutFor(keyLike(e), { dialogOpen: open });
+      const action = shortcutFor(keyLike(e), { dialogOpen: open, singleKeys: getPrefs().singleKeys });
       if (action === null) return;
       // On this page only the letters step through the list; the arrows keep scrolling.
       if ((action === "next" && e.key !== "j") || (action === "prev" && e.key !== "k")) return;
@@ -394,6 +425,21 @@ export default function FeedbackDetail() {
     }
   };
 
+  const hints = prefs.singleKeys && !narrow;
+
+  const copyMessage = async () => {
+    if (await copyText(f.message)) toast.show("Message copied.", "success");
+    else toast.show("Could not copy. Select the text and copy it manually.", "error");
+  };
+  const copyLink = async () => {
+    const url = `${window.location.origin}/feedback/${encodeURIComponent(f.id)}`;
+    if (await copyText(url)) toast.show("Link copied.", "success");
+    else toast.show("Could not copy. Select the text and copy it manually.", "error");
+  };
+
+  const moreFromUser = f.userId !== null && !(others?.userId === f.userId && others.n <= 0);
+  const moreCount = f.userId !== null && others?.userId === f.userId && others.n > 0 ? others.n : null;
+
   // One set of status buttons: inline under the message on desktop, the sticky bar on narrow screens.
   const statusActions = (
     <div
@@ -406,9 +452,11 @@ export default function FeedbackDetail() {
           key={s}
           variant={s === primary ? "primary" : "text"}
           disabled={queue.busy || f.status === s}
+          {...(hints ? { "aria-keyshortcuts": STATUS_KEY[s] } : {})}
           onClick={() => void changeStatus(s)}
         >
           {ACTION_LABEL[s]}
+          {hints ? <Kbd k={STATUS_KEY[s]} /> : null}
         </Button>
       ))}
       {narrow && hasNext ? (
@@ -485,6 +533,15 @@ export default function FeedbackDetail() {
         <TagEditor ref={tagEditor} tags={f.tags} suggestions={tags} onAdd={addTag} onRemove={(t) => void removeTag(t)} />
       </section>
 
+      <div className="copy-actions">
+        <Button variant="text" onClick={() => void copyMessage()}>
+          Copy message
+        </Button>
+        <Button variant="text" onClick={() => void copyLink()}>
+          Copy link
+        </Button>
+      </div>
+
       <section className="section" aria-labelledby={`${listId}-meta`}>
         <h2 className="section-title" id={`${listId}-meta`}>
           Metadata
@@ -494,7 +551,7 @@ export default function FeedbackDetail() {
             {metadata.map(([k, v]) => (
               <div key={k}>
                 <dt>{k}</dt>
-                <dd>{metaValue(v)}</dd>
+                <MetaValue value={v} />
               </div>
             ))}
           </dl>
@@ -511,27 +568,37 @@ export default function FeedbackDetail() {
           <p className="muted">Loading history…</p>
         ) : (
           <ul className="history">
-            <li>Received · {absoluteTime(f.receivedAt)}</li>
+            <li>
+              Received <time dateTime={f.receivedAt}>{historyTime(f.receivedAt)}</time>
+            </li>
             {f.history.map((h, i) => (
               <li key={i}>
-                {STATUS_LABEL[h.from]} → {STATUS_LABEL[h.to]} · {h.userEmail ?? "a removed user"} · via{" "}
-                {h.via === "mcp" ? "MCP" : "UI"} · {absoluteTime(h.at)}
+                {historyLead(h)}, <time dateTime={h.at}>{historyTime(h.at)}</time>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <div className="detail-footer">
-        {f.userId !== null ? (
-          <Link to={`/user/${encodeURIComponent(f.userId)}`}>More from this user →</Link>
-        ) : null}
-        {user?.role === "admin" ? (
+      {f.userId !== null && moreFromUser ? (
+        <div className="detail-footer">
+          <Link to={`/user/${encodeURIComponent(f.userId)}`}>
+            {moreCount !== null ? `More from this user (${moreCount})` : "More from this user"}
+          </Link>
+        </div>
+      ) : null}
+
+      {user?.role === "admin" ? (
+        <section className="section detail-removal" aria-labelledby={`${listId}-removal`}>
+          <h2 className="section-title" id={`${listId}-removal`}>
+            Data removal
+          </h2>
+          <p className="soft">Deleting is permanent. Deleted feedback still counts toward this month&apos;s limit.</p>
           <Button variant="danger" onClick={() => setConfirming(true)}>
             Delete feedback
           </Button>
-        ) : null}
-      </div>
+        </section>
+      ) : null}
 
       {narrow ? statusActions : null}
 

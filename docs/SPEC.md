@@ -210,7 +210,8 @@ Muted, unbleached craft-paper tones with one dusky purple accent. Light mode onl
 | Ink muted | `#73695F` | Metadata |
 | Dusk | `#8C7A8C` | Baxter's nose and the "new" dot |
 | Dusk deep | `#66586A` | Primary button, links |
-| Dusk tint | `#E9E3E8` | Selected rows, New chip |
+| Dusk tint | `#E9E3E8` | New chip, hover |
+| Selection | `#D9CFD8` | Selected rows (one step deeper than dusk tint, so they read as selected and hairlines stay visible) |
 | Dusk ink | `#4E4352` | Text on dusk tint |
 | Sage tint / Sage ink | `#E2E8DC` / `#46573D` | Actioned chip |
 | Brick | `#9E5A4C` | Destructive actions only |

@@ -27,6 +27,8 @@ export interface Channel {
   id: string;
   name: string;
   createdAt: string;
+  /** When feedback last arrived on this channel; null or absent when none has. */
+  lastReceivedAt?: string | null;
 }
 
 export interface Key {
@@ -35,6 +37,8 @@ export interface Key {
   prefix: string;
   createdAt: string;
   revokedAt: string | null;
+  /** When the key last authenticated an ingest call; null or absent when never. */
+  lastUsedAt?: string | null;
 }
 
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };

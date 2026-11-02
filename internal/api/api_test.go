@@ -11,8 +11,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/njkuhne/feedbaxterfree/internal/api"
+	"github.com/njkuhne/feedbaxterfree/internal/store"
 )
 
 func TestLoginFlowForcedChange(t *testing.T) {
@@ -225,7 +227,7 @@ func TestEndpointSmoke(t *testing.T) {
 		// Channels and keys.
 		ch := e.want(e.asAdmin("POST", "/api/channels", map[string]string{"name": "iOS"}), 201).obj(t)
 		chID := ch["id"].(string)
-		if ch["name"] != "iOS" || ch["createdAt"] == nil || len(ch) != 3 {
+		if ch["name"] != "iOS" || ch["createdAt"] == nil || ch["lastReceivedAt"] != nil || len(ch) != 4 {
 			t.Fatalf("channel = %v", ch)
 		}
 		e.wantErr(e.asAdmin("POST", "/api/channels", map[string]string{"name": "iOS"}), 409, "conflict")
@@ -521,7 +523,7 @@ func TestExportCSVQuoting(t *testing.T) {
 		if ct := r.header.Get("Content-Type"); ct != "text/csv; charset=utf-8" {
 			t.Fatalf("Content-Type = %q", ct)
 		}
-		if cd := r.header.Get("Content-Disposition"); !strings.HasPrefix(cd, `attachment; filename="feedback-`) || !strings.HasSuffix(cd, `.csv"`) || len(cd) != len(`attachment; filename="feedback-20060102.csv"`) {
+		if cd := r.header.Get("Content-Disposition"); !strings.HasPrefix(cd, `attachment; filename="feedbaxter-all-`) || !strings.HasSuffix(cd, `.csv"`) || len(cd) != len(`attachment; filename="feedbaxter-all-2006-01-02.csv"`) {
 			t.Fatalf("Content-Disposition = %q", cd)
 		}
 		if r.header.Get("Cache-Control") != "no-store" {
@@ -708,6 +710,79 @@ func TestInternalErrorHidesDetail(t *testing.T) {
 		}
 		if !strings.Contains(e.log.String(), "api: internal error") {
 			t.Fatalf("the error was not logged:\n%s", e.log.String())
+		}
+	})
+}
+
+func TestExportContentDisposition(t *testing.T) {
+	eachDialect(t, func(t *testing.T, e *env) {
+		e.seed("one")
+		day := time.Now().UTC().Format("2006-01-02")
+		for path, want := range map[string]string{
+			"/api/feedback/export?format=csv":                        "feedbaxter-all-" + day + ".csv",
+			"/api/feedback/export?format=json&status=new":            "feedbaxter-new-" + day + ".json",
+			"/api/feedback/export?format=csv&status=new&tag=Big+Bug": "feedbaxter-new-big-bug-" + day + ".csv",
+			"/api/feedback/export?format=csv&q=zzzz&channel=x":       "feedbaxter-all-" + day + ".csv",
+		} {
+			r := e.want(e.asAdmin("GET", path, nil), 200)
+			if cd, w := r.header.Get("Content-Disposition"), `attachment; filename="`+want+`"`; cd != w {
+				t.Errorf("%s: Content-Disposition = %q, want %q", path, cd, w)
+			}
+		}
+	})
+}
+
+func TestKeyJSONLastUsedAt(t *testing.T) {
+	eachDialect(t, func(t *testing.T, e *env) {
+		r := e.want(e.asAdmin("POST", "/api/channels/"+e.channel.ID+"/keys", nil), 201).obj(t)
+		key := r["key"].(map[string]any)
+		id := key["id"].(string)
+		if v, ok := key["lastUsedAt"]; !ok || v != nil {
+			t.Fatalf("create: lastUsedAt = %v (present %v), want null", v, ok)
+		}
+		if got := itemsOf(t, e.want(e.asAdmin("GET", "/api/keys", nil), 200)); got[0]["lastUsedAt"] != nil {
+			t.Fatalf("list before: %v", got[0])
+		}
+		at := time.Date(2026, 5, 6, 7, 8, 9, 123000000, time.UTC)
+		err := store.TouchIngestKeys(context.Background(), e.db.SQL, e.db.Dialect,
+			[]store.KeyTouch{{TenantID: e.tenant.ID, KeyID: id, At: at.UnixMilli()}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := itemsOf(t, e.want(e.asAdmin("GET", "/api/keys", nil), 200)); got[0]["lastUsedAt"] != "2026-05-06T07:08:09.123Z" {
+			t.Fatalf("list after: %v", got[0])
+		}
+		if k := e.want(e.asAdmin("POST", "/api/keys/"+id+"/revoke", nil), 200).obj(t); k["lastUsedAt"] != "2026-05-06T07:08:09.123Z" {
+			t.Fatalf("revoke: %v", k)
+		}
+	})
+}
+
+func TestChannelJSONLastReceivedAt(t *testing.T) {
+	eachDialect(t, func(t *testing.T, e *env) {
+		empty := e.want(e.asAdmin("POST", "/api/channels", map[string]string{"name": "empty"}), 201).obj(t)
+		find := func(id string) map[string]any {
+			for _, c := range itemsOf(t, e.want(e.asAdmin("GET", "/api/channels", nil), 200)) {
+				if c["id"] == id {
+					return c
+				}
+			}
+			t.Fatalf("channel %s not listed", id)
+			return nil
+		}
+		if c := find(e.channel.ID); c["lastReceivedAt"] != nil {
+			t.Fatalf("before feedback: %v", c)
+		}
+		e.seed("a", "b", "c") // received on 2026-03-01, 02 and 03 at 12:00 UTC
+		if c := find(e.channel.ID); c["lastReceivedAt"] != "2026-03-03T12:00:00.000Z" {
+			t.Fatalf("with feedback: %v", c)
+		}
+		if c := find(empty["id"].(string)); c["lastReceivedAt"] != nil {
+			t.Fatalf("empty channel: %v", c)
+		}
+		// The rename response re-lists and carries the field.
+		if c := e.want(e.asAdmin("PATCH", "/api/channels/"+e.channel.ID, map[string]string{"name": "site"}), 200).obj(t); c["lastReceivedAt"] != "2026-03-03T12:00:00.000Z" {
+			t.Fatalf("rename: %v", c)
 		}
 	})
 }

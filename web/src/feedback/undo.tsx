@@ -4,7 +4,9 @@ import { useAnnounce } from "../components/Announcer";
 import { useToast } from "../components/Toast";
 import { errorMessage } from "../lib/api";
 import { addTags, bulkStatus } from "../lib/endpoints";
+import { getPrefs } from "../lib/prefs";
 import { shortcutFor } from "../lib/shortcuts";
+import { NARROW_QUERY } from "../lib/useMediaQuery";
 import type { Feedback, Status } from "../lib/types";
 import { applyFeedback } from "./listStore";
 
@@ -46,6 +48,12 @@ export function groupByStatus(before: Feedback[]): Map<Status, string[]> {
     else groups.set(item.status, [item.id]);
   }
   return groups;
+}
+
+/** The z hint on the Undo action: single keys on and a viewport that has a keyboard. */
+function showHint(): boolean {
+  if (!getPrefs().singleKeys) return false;
+  return !(typeof window.matchMedia === "function" && window.matchMedia(NARROW_QUERY).matches);
 }
 
 const UNDO_KEY = "undo";
@@ -124,7 +132,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
         key: UNDO_KEY,
         duration: UNDO_DURATION,
         live: false,
-        action: { label: "Undo", onAction: () => void undo() },
+        action: { label: "Undo", onAction: () => void undo(), ...(showHint() ? { hint: "z" } : {}) },
         // A newer offer replaces this toast; only the current record's own toast clears it.
         onClose: () => {
           if (record.current === rec) {
@@ -162,7 +170,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
             ? { tagName: t.tagName, isContentEditable: t.isContentEditable, type: t instanceof HTMLInputElement ? t.type : undefined }
             : null,
         },
-        { dialogOpen: document.querySelector('[aria-modal="true"]') !== null },
+        { dialogOpen: document.querySelector('[aria-modal="true"]') !== null, singleKeys: getPrefs().singleKeys },
       );
       if (action !== "undo") return;
       if (record.current === null && pending.current === null) return;

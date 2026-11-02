@@ -1,5 +1,5 @@
 import { Button } from "../components/Button";
-import { shortDate } from "../lib/time";
+import { absoluteTime, relativeTime, shortDate } from "../lib/time";
 import type { Key } from "../lib/types";
 
 interface KeyTableProps {
@@ -19,6 +19,7 @@ export function KeyTable({ channelName, keys, onRevoke }: KeyTableProps) {
           <tr>
             <th scope="col">Key</th>
             <th scope="col">Created</th>
+            <th scope="col">Last used</th>
             <th scope="col">Status</th>
             <th scope="col">
               <span className="visually-hidden">Actions</span>
@@ -32,6 +33,11 @@ export function KeyTable({ channelName, keys, onRevoke }: KeyTableProps) {
               <tr key={k.id} className={revoked ? "row-revoked" : undefined}>
                 <td className="mono">{k.prefix}…</td>
                 <td>{shortDate(k.createdAt)}</td>
+                {k.lastUsedAt ? (
+                  <td title={absoluteTime(k.lastUsedAt)}>{relativeTime(k.lastUsedAt)}</td>
+                ) : (
+                  <td>Never</td>
+                )}
                 <td>{revoked ? `Revoked ${shortDate(k.revokedAt ?? k.createdAt)}` : "Active"}</td>
                 <td className="actions">
                   {revoked ? null : (

@@ -1,6 +1,8 @@
 export type ShortcutAction =
   | "next"
   | "prev"
+  | "extendNext"
+  | "extendPrev"
   | "toggleSelect"
   | "rangeSelect"
   | "open"
@@ -25,6 +27,8 @@ export interface KeyLike {
 
 export interface ShortcutContext {
   dialogOpen: boolean;
+  /** false: every single-character shortcut except "?" is off (WCAG 2.1.4). Read it from getPrefs() at key time. */
+  singleKeys: boolean;
 }
 
 const TYPING = new Set(["INPUT", "SELECT", "TEXTAREA"]);
@@ -36,11 +40,14 @@ const MAP: Record<string, ShortcutAction> = {
   j: "next",
   ArrowDown: "next",
   k: "prev",
+  J: "extendNext",
+  K: "extendPrev",
   ArrowUp: "prev",
   x: "toggleSelect",
   X: "rangeSelect",
   Enter: "open",
   e: "reviewed",
+  r: "reviewed",
   a: "actioned",
   i: "ignored",
   n: "new",
@@ -60,6 +67,7 @@ export function shortcutFor(e: KeyLike, ctx: ShortcutContext): ShortcutAction | 
   if (e.target?.isContentEditable === true || (tag !== undefined && TYPING.has(tag) && !nonText)) return null;
   const action = Object.prototype.hasOwnProperty.call(MAP, e.key) ? MAP[e.key] : undefined;
   if (action === undefined) return null;
+  if (!ctx.singleKeys && e.key.length === 1 && e.key !== "?") return null;
   if (action === "open" && tag !== undefined && NATIVE_ENTER.has(tag)) return null;
   return action;
 }

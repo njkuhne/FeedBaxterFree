@@ -14,6 +14,8 @@
   --dusk-deep: #66586A;
   --dusk-tint: #E9E3E8;
   --dusk-ink: #4E4352;
+  /* selected rows: dusk tint one step deeper. 1.34:1 on paper; ink 8.6:1, ink soft 5.1:1, dusk deep 4.4:1, bark 4.0:1, dusk 2.6:1 on it */
+  --selection: #D9CFD8;
   --sage-tint: #E2E8DC;
   --sage-ink: #46573D;
   --brick: #9E5A4C;

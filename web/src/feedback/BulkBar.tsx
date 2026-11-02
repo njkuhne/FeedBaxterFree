@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { Button } from "../components/Button";
+import { Kbd } from "../components/Kbd";
+import { usePrefs } from "../lib/prefs";
 import type { Feedback, Status, TagCount } from "../lib/types";
 import { usePopover } from "./ExportMenu";
 import { ACTION_LABEL, ACTION_ORDER } from "./statusCopy";
@@ -24,7 +26,11 @@ interface BulkBarProps {
   onClear: () => void;
   /** Narrow Select mode has its own Done button, so the bar leaves out Clear. */
   hideClear?: boolean;
+  /** Narrow screens have no keyboard hints. */
+  narrow?: boolean;
 }
+
+export const STATUS_KEY: Record<Status, string> = { reviewed: "e", actioned: "a", ignored: "i", new: "n" };
 
 /** The popover behind "Tag…": the shared tag editor in add-only mode. It stays open for another tag. */
 function BulkTagPopover({
@@ -129,14 +135,23 @@ export function BulkBar({
   onRemoveTag,
   onClear,
   hideClear = false,
+  narrow = false,
 }: BulkBarProps) {
   const working = busy > 0;
+  const hints = usePrefs().singleKeys && !narrow;
   return (
     <div className="bulk" role="toolbar" aria-label="Bulk actions">
       <span className="bulk-count">{working ? `Updating ${busy}…` : `${count} selected`}</span>
       {ACTION_ORDER.filter((s) => s !== status).map((s) => (
-        <Button key={s} variant="text" disabled={working} onClick={() => onStatus(s)}>
+        <Button
+          key={s}
+          variant="text"
+          disabled={working}
+          {...(hints ? { "aria-keyshortcuts": STATUS_KEY[s] } : {})}
+          onClick={() => onStatus(s)}
+        >
           {ACTION_LABEL[s]}
+          {hints ? <Kbd k={STATUS_KEY[s]} /> : null}
         </Button>
       ))}
       <BulkTagPopover tags={tags} disabled={working} requested={tagRequested} onOpened={onTagOpened} onAddTag={onAddTag} />

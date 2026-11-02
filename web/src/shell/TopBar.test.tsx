@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockMatchMedia } from "../test-media";
@@ -77,7 +77,7 @@ describe("TopBar", () => {
     fireEvent.click(menuButton());
     expect(screen.getByRole("link", { name: "Inbox" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Profile" })).toBeTruthy();
-    for (const name of ["Channels and keys", "People", "Settings"]) {
+    for (const name of ["Channels and keys", "People", "System"]) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
     expect(screen.getByText("Reviewer")).toBeTruthy();
@@ -87,7 +87,25 @@ describe("TopBar", () => {
     renderShell();
     fireEvent.click(menuButton());
     const names = navLinks().map((a) => a.textContent);
-    expect(names).toEqual(["Inbox", "Channels and keys", "People", "Settings", "Profile"]);
+    expect(names).toEqual(["Inbox", "Channels and keys", "People", "System", "Profile"]);
+  });
+
+  it("rail shows a Profile link", () => {
+    restore();
+    restore = mockMatchMedia(false);
+    renderShell();
+    const rail = screen.getByRole("navigation", { name: "Main" });
+    const profile = within(rail).getByRole("link", { name: "Profile" });
+    expect(profile.getAttribute("href")).toBe("/profile");
+    // The email is plain text, not the profile link.
+    expect(within(rail).getByText("nick@example.com").closest("a")).toBeNull();
+  });
+
+  it("nav says System, not Settings", () => {
+    renderShell();
+    fireEvent.click(menuButton());
+    expect(screen.getByRole("link", { name: "System" }).getAttribute("href")).toBe("/system");
+    expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
   });
 
   it("shell renders the rail on desktop and the top bar on narrow", () => {

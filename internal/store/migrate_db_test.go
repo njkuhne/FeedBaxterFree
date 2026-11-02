@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"database/sql"
 	"reflect"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestMigrateFresh(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := []string{"0001_core", "0002_triage"}; !reflect.DeepEqual(got, want) {
+		if want := []string{"0001_core", "0002_triage", "0003_key_last_used"}; !reflect.DeepEqual(got, want) {
 			t.Fatalf("applied %v, want %v", got, want)
 		}
 		for _, tbl := range coreTables {
@@ -52,8 +53,8 @@ func TestMigrateIdempotent(t *testing.T) {
 		if len(got) != 0 {
 			t.Errorf("second call applied %v", got)
 		}
-		if n := count(t, db, "schema_migrations"); n != 2 {
-			t.Errorf("schema_migrations rows = %d, want 2", n)
+		if n := count(t, db, "schema_migrations"); n != 3 {
+			t.Errorf("schema_migrations rows = %d, want 3", n)
 		}
 	})
 }
@@ -70,7 +71,7 @@ func TestMigrateExtension(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := []string{"0001_core", "0002_triage", "ext_0001_demo"}; !reflect.DeepEqual(got, want) {
+		if want := []string{"0001_core", "0002_triage", "0003_key_last_used", "ext_0001_demo"}; !reflect.DeepEqual(got, want) {
 			t.Fatalf("applied %v, want %v", got, want)
 		}
 		count(t, db, "demo")
@@ -93,6 +94,37 @@ func TestMigrateExtension(t *testing.T) {
 		// nothing at all may exist.
 		if _, qerr := db.SQL.Exec("SELECT 1 FROM tenants"); qerr == nil {
 			t.Error("core schema was applied despite rejected extension")
+		}
+	})
+}
+
+func TestMigration0003AddsLastUsedAt(t *testing.T) {
+	storetest.ForEachDialectEmpty(t, func(t *testing.T, db *store.DB) {
+		ctx := context.Background()
+		if _, err := store.Migrate(ctx, db, nil); err != nil {
+			t.Fatal(err)
+		}
+		tn, err := store.CreateTenant(ctx, db.SQL, db.Dialect, "acme", 1, 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ch, err := store.CreateChannel(ctx, db.SQL, db.Dialect, tn.ID, "main", 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		k, err := store.CreateIngestKey(ctx, db.SQL, db.Dialect, tn.ID, ch.ID, store.GenerateIngestKey(), 2000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var last sql.NullInt64
+		if err := db.SQL.QueryRow(db.Dialect.Rebind("SELECT last_used_at FROM ingest_keys WHERE id = ?"), k.ID).Scan(&last); err != nil {
+			t.Fatalf("last_used_at column: %v", err)
+		}
+		if last.Valid {
+			t.Errorf("new key last_used_at = %d, want NULL", last.Int64)
+		}
+		if k.LastUsedAt != nil {
+			t.Errorf("created key LastUsedAt = %v", *k.LastUsedAt)
 		}
 	})
 }
